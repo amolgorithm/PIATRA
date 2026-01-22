@@ -21,7 +21,6 @@ class AppTheme {
         seedColor: primaryGreen,
         primary: primaryGreen,
         secondary: secondaryOrange,
-        background: backgroundColor,
         surface: cardColor,
         error: errorRed,
       ),
@@ -37,7 +36,7 @@ class AppTheme {
           fontWeight: FontWeight.bold,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: cardColor,
         elevation: 2,
         shape: RoundedRectangleBorder(
