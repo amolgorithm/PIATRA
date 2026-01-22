@@ -115,7 +115,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),
