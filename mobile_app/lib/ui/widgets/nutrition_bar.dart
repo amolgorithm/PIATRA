@@ -12,10 +12,10 @@ class NutritionBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.primaryGreen.withOpacity(0.05),
+        color: AppTheme.primaryGreen.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppTheme.primaryGreen.withOpacity(0.2),
+          color: AppTheme.primaryGreen.withValues(alpha: 0.2),
           width: 1,
         ),
       ),

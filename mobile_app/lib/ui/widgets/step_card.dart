@@ -20,7 +20,7 @@ class StepCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppTheme.primaryGreen.withOpacity(0.2),
+          color: AppTheme.primaryGreen.withValues(alpha: 0.2),
           width: 1,
         ),
       ),

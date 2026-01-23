@@ -41,14 +41,14 @@ class RecipeDetailScreen extends StatelessWidget {
   Widget _buildHeader(BuildContext context) {
     return Container(
       height: 200,
-      color: AppTheme.primaryGreen.withOpacity(0.1),
+      color: AppTheme.primaryGreen.withValues(alpha: 0.1),
       child: Stack(
         children: [
           Center(
             child: Icon(
               Icons.restaurant,
               size: 80,
-              color: AppTheme.primaryGreen.withOpacity(0.3),
+              color: AppTheme.primaryGreen.withValues(alpha: 0.3),
             ),
           ),
           Positioned(
@@ -113,7 +113,7 @@ class RecipeDetailScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: AppTheme.primaryGreen.withOpacity(0.1),
+        color: AppTheme.primaryGreen.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -210,7 +210,7 @@ class RecipeDetailScreen extends StatelessWidget {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),

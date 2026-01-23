@@ -24,11 +24,11 @@ dependencies:
   http: ^1.1.0
   
   # Firebase (will be needed later)
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.15.3
+  firebase_core: ^3.0.0
+  firebase_auth: ^5.0.0
   
   # Image Processing (will be needed later)
-  image_picker: ^1.0.4
+  image_picker: ^1.2.0
   camera: ^0.10.5+5
   
   # ML (will be needed later)
@@ -36,6 +36,9 @@ dependencies:
   
   # Utils
   intl: ^0.18.1
+  
+  # Web support
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_test:

@@ -34,7 +34,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     child: Icon(
                       Icons.camera_alt_outlined,
                       size: 100,
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                     ),
                   ),
                   Center(
@@ -58,7 +58,7 @@ class _ScanScreenState extends State<ScanScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.7),
+                          color: Colors.black.withValues(alpha: 0.7),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Column(
@@ -76,7 +76,7 @@ class _ScanScreenState extends State<ScanScreen> {
                             Text(
                               'Confidence: ${(_confidence! * 100).toStringAsFixed(0)}%',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.8),
+                                color: Colors.white.withValues(alpha: 0.8),
                                 fontSize: 14,
                               ),
                             ),

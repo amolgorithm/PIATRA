@@ -73,7 +73,7 @@ class RecipeCard extends StatelessWidget {
                         tag,
                         style: const TextStyle(fontSize: 11),
                       ),
-                      backgroundColor: AppTheme.primaryGreen.withOpacity(0.1),
+                      backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.1),
                       labelStyle: const TextStyle(
                         color: AppTheme.primaryGreen,
                         fontWeight: FontWeight.w500,
@@ -105,7 +105,7 @@ class RecipeCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
