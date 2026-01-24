@@ -2,4 +2,4 @@
 
 Smart Pantry &amp; Recipe Intelligence App
 
-![PIATRA Mascot][PIATRA.jpg]
+![PIATRA Mascot](PIATRA.jpg)
