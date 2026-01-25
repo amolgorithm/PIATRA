@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/pantry_item.dart';
 import '../widgets/ingredient_card.dart';
+import '../widgets/ai_assistant_fab.dart';
+import '../widgets/theme_toggle_fab.dart';
 import '../../core/constants/theme/app_theme.dart';
 
 class PantryScreen extends StatefulWidget {
@@ -11,7 +13,8 @@ class PantryScreen extends StatefulWidget {
 }
 
 class _PantryScreenState extends State<PantryScreen> {
-  // Hardcoded sample data for now
+  String _selectedFilter = 'All';
+  
   final List<PantryItem> _pantryItems = [
     PantryItem(
       id: '1',
@@ -59,25 +62,124 @@ class _PantryScreenState extends State<PantryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Pantry'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showAddItemDialog,
+      body: Stack(
+        children: [
+          // Background gradient
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [AppTheme.backgroundDark, AppTheme.surfaceDark]
+                    : [AppTheme.backgroundLight, Colors.white],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
           ),
+          
+          SafeArea(
+            child: Column(
+              children: [
+                // Custom App Bar
+                Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        style: IconButton.styleFrom(
+                          backgroundColor: isDark ? AppTheme.cardDark : Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'My Pantry',
+                              style: Theme.of(context).textTheme.headlineMedium,
+                            ),
+                            Text(
+                              '${_pantryItems.length} items',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: _showAddItemDialog,
+                        icon: const Icon(Icons.add_rounded),
+                        style: IconButton.styleFrom(
+                          backgroundColor: AppTheme.primaryPurple,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Filter chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      _FilterChip(
+                        label: 'All',
+                        isSelected: _selectedFilter == 'All',
+                        onTap: () => setState(() => _selectedFilter = 'All'),
+                      ),
+                      _FilterChip(
+                        label: 'Expiring Soon',
+                        isSelected: _selectedFilter == 'Expiring Soon',
+                        onTap: () => setState(() => _selectedFilter = 'Expiring Soon'),
+                      ),
+                      _FilterChip(
+                        label: 'Vegetables',
+                        isSelected: _selectedFilter == 'Vegetables',
+                        onTap: () => setState(() => _selectedFilter = 'Vegetables'),
+                      ),
+                      _FilterChip(
+                        label: 'Dairy',
+                        isSelected: _selectedFilter == 'Dairy',
+                        onTap: () => setState(() => _selectedFilter = 'Dairy'),
+                      ),
+                      _FilterChip(
+                        label: 'Meat',
+                        isSelected: _selectedFilter == 'Meat',
+                        onTap: () => setState(() => _selectedFilter = 'Meat'),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Items list
+                Expanded(
+                  child: _pantryItems.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 100),
+                          itemCount: _pantryItems.length,
+                          itemBuilder: (context, index) {
+                            return IngredientCard(item: _pantryItems[index]);
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ),
+          
+          const ThemeToggleFAB(),
+          const AIAssistantFAB(),
         ],
       ),
-      body: _pantryItems.isEmpty
-          ? _buildEmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.only(top: 8),
-              itemCount: _pantryItems.length,
-              itemBuilder: (context, index) {
-                return IngredientCard(item: _pantryItems[index]);
-              },
-            ),
     );
   }
 
@@ -86,12 +188,19 @@ class _PantryScreenState extends State<PantryScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.kitchen_outlined,
-            size: 80,
-            color: AppTheme.textSecondary,
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.kitchen_outlined,
+              size: 80,
+              color: Colors.white,
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           Text(
             'Your pantry is empty',
             style: Theme.of(context).textTheme.headlineSmall,
@@ -100,10 +209,10 @@ class _PantryScreenState extends State<PantryScreen> {
           Text(
             'Add ingredients to get started',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+              color: AppTheme.textSecondaryLight,
+            ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           ElevatedButton.icon(
             onPressed: _showAddItemDialog,
             icon: const Icon(Icons.add),
@@ -128,6 +237,58 @@ class _PantryScreenState extends State<PantryScreen> {
             child: const Text('OK'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _FilterChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: isSelected ? AppTheme.primaryGradient : null,
+            color: isSelected
+                ? null
+                : isDark
+                    ? AppTheme.cardDark
+                    : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected
+                  ? Colors.transparent
+                  : (isDark ? Colors.white : Colors.black).withOpacity(0.1),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected
+                  ? Colors.white
+                  : isDark
+                      ? AppTheme.textPrimaryDark
+                      : AppTheme.textPrimaryLight,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -12,26 +12,27 @@ dependencies:
   
   # UI
   cupertino_icons: ^1.0.2
+  google_fonts: ^6.1.0
   
-  # State Management (will be needed later)
+  # State Management
   provider: ^6.0.5
   
-  # Local Storage (will be needed later)
+  # Local Storage
   sqflite: ^2.3.0
   path_provider: ^2.1.1
   
-  # Networking (will be needed later)
+  # Networking
   http: ^1.1.0
   
-  # Firebase (will be needed later)
+  # Firebase
   firebase_core: ^3.0.0
   firebase_auth: ^5.0.0
   
-  # Image Processing (will be needed later)
+  # Image Processing
   image_picker: ^1.2.0
   camera: ^0.10.5+5
   
-  # ML (will be needed later)
+  # ML
   tflite_flutter: ^0.10.4
   
   # Utils

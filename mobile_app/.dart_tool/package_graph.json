@@ -12,6 +12,7 @@
         "firebase_auth",
         "firebase_core",
         "flutter",
+        "google_fonts",
         "http",
         "image_picker",
         "intl",
@@ -162,6 +163,16 @@
         "collection",
         "flutter",
         "nested"
+      ]
+    },
+    {
+      "name": "google_fonts",
+      "version": "6.3.3",
+      "dependencies": [
+        "crypto",
+        "flutter",
+        "http",
+        "path_provider"
       ]
     },
     {
@@ -529,6 +540,13 @@
       "version": "1.0.0",
       "dependencies": [
         "flutter"
+      ]
+    },
+    {
+      "name": "crypto",
+      "version": "3.0.7",
+      "dependencies": [
+        "typed_data"
       ]
     },
     {
