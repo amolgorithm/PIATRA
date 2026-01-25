@@ -55,7 +55,7 @@ class _AIAssistantFABState extends State<AIAssistantFAB> with SingleTickerProvid
           GestureDetector(
             onTap: _toggleExpanded,
             child: Container(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
             ),
           ),
         
@@ -79,7 +79,7 @@ class _AIAssistantFABState extends State<AIAssistantFAB> with SingleTickerProvid
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -114,7 +114,7 @@ class _AIAssistantFABState extends State<AIAssistantFAB> with SingleTickerProvid
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primaryPurple.withOpacity(0.4),
+              color: AppTheme.primaryPurple.withValues(alpha: 0.4),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -147,7 +147,7 @@ class _AIAssistantFABState extends State<AIAssistantFAB> with SingleTickerProvid
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(

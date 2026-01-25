@@ -274,7 +274,7 @@ class _FilterChip extends StatelessWidget {
             border: Border.all(
               color: isSelected
                   ? Colors.transparent
-                  : (isDark ? Colors.white : Colors.black).withOpacity(0.1),
+                  : (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
             ),
           ),
           child: Text(

@@ -47,7 +47,7 @@ class HomeScreen extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppTheme.primaryPurple.withOpacity(0.3),
+                                    color: AppTheme.primaryPurple.withValues(alpha: 0.3),
                                     blurRadius: 15,
                                     offset: const Offset(0, 5),
                                   ),
@@ -235,7 +235,7 @@ class _FeatureCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: gradient.colors.first.withOpacity(0.3),
+              color: gradient.colors.first.withValues(alpha: 0.3),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -250,7 +250,7 @@ class _FeatureCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -274,7 +274,7 @@ class _FeatureCard extends StatelessWidget {
                   Text(
                     description,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withValues(alpha: 0.9),
                       fontSize: 13,
                     ),
                   ),
@@ -311,7 +311,7 @@ class _StatCard extends StatelessWidget {
         color: isDark ? AppTheme.cardDark : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: (isDark ? Colors.white : Colors.black).withOpacity(0.05),
+          color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.05),
         ),
       ),
       child: Column(
