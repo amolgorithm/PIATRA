@@ -321,7 +321,7 @@ class _ScanScreenState extends State<ScanScreen> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.7),
+                      color: Colors.black.withValues(alpha: 0.7),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
@@ -370,7 +370,7 @@ class _ScanScreenState extends State<ScanScreen> {
               color: _isProcessing ? Colors.grey : null,
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primaryPurple.withOpacity(0.4),
+                  color: AppTheme.primaryPurple.withValues(alpha: 0.4),
                   blurRadius: 20,
                   offset: const Offset(0, 8),
                 ),
