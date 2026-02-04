@@ -7,13 +7,14 @@
       "name": "piatra",
       "version": "1.0.0+1",
       "dependencies": [
-        "camera",
+        "cloud_firestore",
         "cupertino_icons",
         "firebase_auth",
         "firebase_core",
         "flutter",
         "google_fonts",
         "http",
+        "image",
         "image_picker",
         "intl",
         "path_provider",
@@ -78,15 +79,12 @@
       ]
     },
     {
-      "name": "camera",
-      "version": "0.10.5+9",
+      "name": "image",
+      "version": "4.7.2",
       "dependencies": [
-        "camera_android",
-        "camera_avfoundation",
-        "camera_platform_interface",
-        "camera_web",
-        "flutter",
-        "flutter_plugin_android_lifecycle"
+        "archive",
+        "meta",
+        "xml"
       ]
     },
     {
@@ -101,6 +99,19 @@
         "image_picker_macos",
         "image_picker_platform_interface",
         "image_picker_windows"
+      ]
+    },
+    {
+      "name": "cloud_firestore",
+      "version": "5.6.12",
+      "dependencies": [
+        "cloud_firestore_platform_interface",
+        "cloud_firestore_web",
+        "collection",
+        "firebase_core",
+        "firebase_core_platform_interface",
+        "flutter",
+        "meta"
       ]
     },
     {
@@ -301,49 +312,21 @@
       ]
     },
     {
-      "name": "flutter_plugin_android_lifecycle",
-      "version": "2.0.19",
+      "name": "xml",
+      "version": "6.6.1",
       "dependencies": [
-        "flutter"
+        "collection",
+        "meta",
+        "petitparser"
       ]
     },
     {
-      "name": "camera_web",
-      "version": "0.3.4",
+      "name": "archive",
+      "version": "4.0.7",
       "dependencies": [
-        "camera_platform_interface",
-        "flutter",
-        "flutter_web_plugins",
-        "stream_transform"
-      ]
-    },
-    {
-      "name": "camera_platform_interface",
-      "version": "2.8.0",
-      "dependencies": [
-        "cross_file",
-        "flutter",
-        "plugin_platform_interface",
-        "stream_transform"
-      ]
-    },
-    {
-      "name": "camera_avfoundation",
-      "version": "0.9.13+10",
-      "dependencies": [
-        "camera_platform_interface",
-        "flutter",
-        "stream_transform"
-      ]
-    },
-    {
-      "name": "camera_android",
-      "version": "0.10.9+2",
-      "dependencies": [
-        "camera_platform_interface",
-        "flutter",
-        "flutter_plugin_android_lifecycle",
-        "stream_transform"
+        "crypto",
+        "path",
+        "posix"
       ]
     },
     {
@@ -421,6 +404,31 @@
         "collection",
         "flutter",
         "flutter_test",
+        "meta",
+        "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "cloud_firestore_web",
+      "version": "4.4.12",
+      "dependencies": [
+        "_flutterfire_internals",
+        "cloud_firestore_platform_interface",
+        "collection",
+        "firebase_core",
+        "firebase_core_web",
+        "flutter",
+        "flutter_web_plugins"
+      ]
+    },
+    {
+      "name": "cloud_firestore_platform_interface",
+      "version": "6.6.12",
+      "dependencies": [
+        "_flutterfire_internals",
+        "collection",
+        "firebase_core",
+        "flutter",
         "meta",
         "plugin_platform_interface"
       ]
@@ -616,23 +624,20 @@
       ]
     },
     {
-      "name": "stream_transform",
-      "version": "2.1.1",
-      "dependencies": []
-    },
-    {
-      "name": "flutter_web_plugins",
-      "version": "0.0.0",
+      "name": "petitparser",
+      "version": "7.0.1",
       "dependencies": [
-        "flutter"
+        "collection",
+        "meta"
       ]
     },
     {
-      "name": "cross_file",
-      "version": "0.3.5+1",
+      "name": "posix",
+      "version": "6.0.3",
       "dependencies": [
+        "ffi",
         "meta",
-        "web"
+        "path"
       ]
     },
     {
@@ -652,6 +657,14 @@
         "flutter",
         "http",
         "plugin_platform_interface"
+      ]
+    },
+    {
+      "name": "cross_file",
+      "version": "0.3.5+1",
+      "dependencies": [
+        "meta",
+        "web"
       ]
     },
     {
@@ -676,6 +689,20 @@
       "name": "mime",
       "version": "1.0.6",
       "dependencies": []
+    },
+    {
+      "name": "flutter_web_plugins",
+      "version": "0.0.0",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
+      "name": "flutter_plugin_android_lifecycle",
+      "version": "2.0.19",
+      "dependencies": [
+        "flutter"
+      ]
     },
     {
       "name": "_flutterfire_internals",

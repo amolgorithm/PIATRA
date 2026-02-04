@@ -27,10 +27,12 @@ dependencies:
   # Firebase
   firebase_core: ^3.0.0
   firebase_auth: ^5.0.0
+  cloud_firestore: ^5.6.12
   
-  # Image Processing
+  # Image Processing - CAMERA REMOVED, ONLY IMAGE_PICKER
   image_picker: ^1.2.0
-  camera: ^0.10.5+5
+  image: ^4.1.0
+  # camera: ^0.10.5+5  # ← REMOVED - causing issues
   
   # ML
   tflite_flutter: ^0.10.4

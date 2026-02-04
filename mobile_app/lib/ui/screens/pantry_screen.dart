@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../models/pantry_item.dart';
 import '../widgets/ingredient_card.dart';
 import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
 import '../../core/constants/theme/app_theme.dart';
+import '../../services/pantry_sync_manager.dart';
 
 class PantryScreen extends StatefulWidget {
   const PantryScreen({super.key});
@@ -14,51 +17,9 @@ class PantryScreen extends StatefulWidget {
 
 class _PantryScreenState extends State<PantryScreen> {
   String _selectedFilter = 'All';
-  
-  final List<PantryItem> _pantryItems = [
-    PantryItem(
-      id: '1',
-      name: 'Lettuce',
-      quantity: '2 heads',
-      expiryDate: DateTime.now().add(const Duration(days: 3)),
-      category: 'Vegetables',
-    ),
-    PantryItem(
-      id: '2',
-      name: 'Tomatoes',
-      quantity: '5',
-      expiryDate: DateTime.now().add(const Duration(days: 6)),
-      category: 'Vegetables',
-    ),
-    PantryItem(
-      id: '3',
-      name: 'Cheese',
-      quantity: '1 block',
-      expiryDate: DateTime.now().add(const Duration(days: 14)),
-      category: 'Dairy',
-    ),
-    PantryItem(
-      id: '4',
-      name: 'Milk',
-      quantity: '2 liters',
-      expiryDate: DateTime.now().add(const Duration(days: 2)),
-      category: 'Dairy',
-    ),
-    PantryItem(
-      id: '5',
-      name: 'Chicken Breast',
-      quantity: '500g',
-      expiryDate: DateTime.now().add(const Duration(days: 1)),
-      category: 'Meat',
-    ),
-    PantryItem(
-      id: '6',
-      name: 'Eggs',
-      quantity: '12',
-      expiryDate: DateTime.now().add(const Duration(days: 10)),
-      category: 'Dairy',
-    ),
-  ];
+
+  final List<PantryItem> _pantryItems = [];
+  StreamSubscription<List<PantryItem>>? _syncSub;
 
   @override
   Widget build(BuildContext context) {
@@ -168,7 +129,12 @@ class _PantryScreenState extends State<PantryScreen> {
                           padding: const EdgeInsets.only(bottom: 100),
                           itemCount: _pantryItems.length,
                           itemBuilder: (context, index) {
-                            return IngredientCard(item: _pantryItems[index]);
+                            final item = _pantryItems[index];
+                            return IngredientCard(
+                              item: item,
+                              onEdit: () => _showAddEditDialog(item: item),
+                              onDelete: () => PantrySyncManager.instance.deleteItem(item.id),
+                            );
                           },
                         ),
                 ),
@@ -181,6 +147,27 @@ class _PantryScreenState extends State<PantryScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Start sync manager and listen for local item updates
+    PantrySyncManager.instance.start();
+    _syncSub = PantrySyncManager.instance.localStream.listen((items) {
+      setState(() {
+        _pantryItems
+          ..clear()
+          ..addAll(items);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _syncSub?.cancel();
+    PantrySyncManager.instance.stop();
+    super.dispose();
   }
 
   Widget _buildEmptyState() {
@@ -224,21 +211,111 @@ class _PantryScreenState extends State<PantryScreen> {
   }
 
   void _showAddItemDialog() {
+    _showAddEditDialog();
+  }
+
+  void _showAddEditDialog({PantryItem? item}) {
+    final isNew = item == null;
+    final nameCtrl = TextEditingController(text: item?.name ?? '');
+    final qtyCtrl = TextEditingController(text: item?.quantity ?? '');
+    String category = item?.category ?? 'Other';
+    DateTime? expiry = item?.expiryDate;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Ingredient'),
-        content: const Text(
-          'Manual ingredient entry coming soon!\nFor now, use the scan feature.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+      builder: (context) => StatefulBuilder(builder: (context, setState) {
+        return AlertDialog(
+          title: Text(isNew ? 'Add Item' : 'Edit Item'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
+                const SizedBox(height: 8),
+                TextField(controller: qtyCtrl, decoration: const InputDecoration(labelText: 'Quantity')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: category,
+                  items: const [
+                    DropdownMenuItem(value: 'Vegetables', child: Text('Vegetables')),
+                    DropdownMenuItem(value: 'Dairy', child: Text('Dairy')),
+                    DropdownMenuItem(value: 'Meat', child: Text('Meat')),
+                    DropdownMenuItem(value: 'Fruits', child: Text('Fruits')),
+                    DropdownMenuItem(value: 'Other', child: Text('Other')),
+                  ],
+                  onChanged: (v) => setState(() => category = v ?? 'Other'),
+                  decoration: const InputDecoration(labelText: 'Category'),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                          child: Text(expiry != null ? 'Expiry: ${_formatDate(expiry!)}' : 'No expiry'),
+                        ),
+                    TextButton(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: expiry ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) setState(() => expiry = picked);
+                      },
+                      child: const Text('Pick Date'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+          actions: [
+            if (!isNew)
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  PantrySyncManager.instance.deleteItem(item!.id);
+                },
+                child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              ),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                final qty = qtyCtrl.text.trim();
+                if (name.isEmpty || qty.isEmpty) return;
+                if (isNew) {
+                  final newItem = PantryItem(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    name: name,
+                    quantity: qty,
+                    expiryDate: expiry,
+                    category: category,
+                  );
+                  PantrySyncManager.instance.addItem(newItem);
+                } else {
+                  final updated = PantryItem(
+                    id: item!.id,
+                    name: name,
+                    quantity: qty,
+                    expiryDate: expiry,
+                    category: category,
+                  );
+                  PantrySyncManager.instance.updateItem(updated);
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      }),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }
 
