@@ -60,8 +60,8 @@ class PantryScanner {
       // Preprocess the image
       final Float32List inputImage = await ImagePreprocessor.preprocessImage(imagePath);
       
-      // Reshape input for the model [1, 300, 300, 3]
-      final input = inputImage.reshape([1, 300, 300, 3]);
+      // Input for the model [1, 300, 300, 3]
+      final input = inputImage;
       
       // Prepare output buffers
       // MobileNet-SSD typically outputs:
@@ -73,9 +73,9 @@ class PantryScanner {
       final outputLocations = List.generate(1, (i) => 
         List.generate(maxDetections, (j) => List.filled(4, 0.0))
       );
-      final outputClasses = List.filled(maxDetections, 0.0).reshape([1, maxDetections]);
-      final outputScores = List.filled(maxDetections, 0.0).reshape([1, maxDetections]);
-      final numDetections = List.filled(1, 0.0);
+      final outputClasses = List<List<double>>.generate(1, (i) => List.filled(maxDetections, 0.0));
+      final outputScores = List<List<double>>.generate(1, (i) => List.filled(maxDetections, 0.0));
+      final numDetections = [0.0];
       
       // Create outputs map
       final outputs = {
@@ -89,11 +89,12 @@ class PantryScanner {
       _interpreter!.runForMultipleInputs([input], outputs);
       
       // Parse results
+      final numDetectionsInt = (numDetections[0] as num).toInt();
       return _parseDetections(
         outputLocations,
         outputClasses[0],
         outputScores[0],
-        numDetections[0].toInt(),
+        numDetectionsInt,
       );
     } catch (e) {
       print('Error during detection: $e');
@@ -150,12 +151,6 @@ class PantryScanner {
   
   /// Filter detections to only include food-related items
   List<DetectionResult> filterFoodItems(List<DetectionResult> detections) {
-    // COCO food-related class indices
-    const foodIndices = {
-      47, 48, 49, 50, 51, 52, 53, 54, 55, 56, // banana to donut
-      40, 41, 42, 43, 44, 45, 46, // bottle to bowl
-    };
-    
     final foodLabels = {
       'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
       'hot dog', 'pizza', 'donut', 'cake', 'bottle', 'wine glass',

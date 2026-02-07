@@ -235,7 +235,7 @@ class _PantryScreenState extends State<PantryScreen> {
                 TextField(controller: qtyCtrl, decoration: const InputDecoration(labelText: 'Quantity')),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: category,
+                  initialValue: category,
                   items: const [
                     DropdownMenuItem(value: 'Vegetables', child: Text('Vegetables')),
                     DropdownMenuItem(value: 'Dairy', child: Text('Dairy')),

@@ -59,7 +59,7 @@ class PantryItem {
 
   /// Try to extract an integer quantity from the `quantity` string.
   /// Returns null when no numeric value can be parsed.
-  int? quantityAsInt() {
+  int? quantityAsInt() { 
     final regex = RegExp(r"(\\d+)");
     final match = regex.firstMatch(quantity);
     if (match == null) return null;
