@@ -35,7 +35,7 @@ dependencies:
   # camera: ^0.10.5+5  # ← REMOVED - causing issues
   
   # ML
-  tflite_flutter: ^0.10.4
+  tflite_flutter: ^0.11.0
   
   # Utils
   intl: ^0.18.1
@@ -51,7 +51,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   
-  # Assets will be added here later
-  # assets:
-  #   - assets/models/
-  #   - assets/images/
+  # Assets
+  assets:
+    - assets/models/pantry_model.tflite
