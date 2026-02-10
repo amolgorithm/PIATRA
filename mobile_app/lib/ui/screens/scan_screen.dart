@@ -7,6 +7,7 @@ import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
 import '../../ml/pantry_scanner.dart';
 import '../../ml/detection_result.dart';
+import '../../models/detected_item.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -21,7 +22,7 @@ class _ScanScreenState extends State<ScanScreen> {
   XFile? _capturedImage;
   final ImagePicker _imagePicker = ImagePicker();
   final PantryScanner _scanner = PantryScanner();
-  List<DetectionResult>? _detectionResults;
+  List<DetectedItem> _detectedItems = [];
 
   @override
   void initState() {
@@ -44,7 +45,6 @@ class _ScanScreenState extends State<ScanScreen> {
     super.dispose();
   }
 
-  // Logic from "Old version" - Using ImagePicker with specific constraints
   Future<void> _takePicture() async {
     setState(() => _isProcessing = true);
     try {
@@ -86,11 +86,10 @@ class _ScanScreenState extends State<ScanScreen> {
   void _retake() {
     setState(() {
       _capturedImage = null;
-      _detectionResults = null;
+      _detectedItems = [];
     });
   }
 
-  // MobileNet-SSD Logic from "New version"
   Future<void> _processImage() async {
     if (_capturedImage == null) return;
 
@@ -101,11 +100,15 @@ class _ScanScreenState extends State<ScanScreen> {
       final foodItems = _scanner.filterFoodItems(results);
 
       setState(() {
-        _detectionResults = foodItems;
+        _detectedItems = foodItems
+            .asMap()
+            .entries
+            .map((entry) => DetectedItem.fromDetection(entry.value, index: entry.key))
+            .toList();
         _isProcessing = false;
       });
 
-      if (foodItems.isEmpty) {
+      if (_detectedItems.isEmpty) {
         _showWarningSnackBar('No food items detected. Try better lighting.');
       } else {
         _showDetectionResults();
@@ -116,13 +119,21 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
-  // UI: Results Sheet from "New version"
   void _showDetectionResults() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
-      builder: (context) => _buildResultsSheet(),
+      builder: (context) => _DetectionResultsSheet(
+        detectedItems: _detectedItems,
+        onItemsUpdated: (updatedItems) {
+          setState(() => _detectedItems = updatedItems);
+        },
+        onConfirm: _addToPantry,
+        onCancel: () => Navigator.pop(context),
+      ),
     );
   }
 
@@ -162,8 +173,6 @@ class _ScanScreenState extends State<ScanScreen> {
     );
   }
 
-  // UI Components -----------------------------------------------------------
-
   Widget _buildAppBar(bool isDark) {
     return Padding(
       padding: const EdgeInsets.all(20.0),
@@ -185,7 +194,9 @@ class _ScanScreenState extends State<ScanScreen> {
                 Text(
                   _capturedImage == null
                       ? 'Choose how to add image'
-                      : _isProcessing ? 'Processing...' : 'Review and confirm',
+                      : _isProcessing
+                          ? 'Processing...'
+                          : 'Review and confirm',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -216,7 +227,9 @@ class _ScanScreenState extends State<ScanScreen> {
             Text('Ready to Scan', style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 12),
             Text(
-              kIsWeb ? 'Click "Take Photo" for camera\nor "Gallery" for local files' : 'Snap a photo or pick from gallery',
+              kIsWeb
+                  ? 'Click "Take Photo" for camera\nor "Gallery" for local files'
+                  : 'Snap a photo or pick from gallery',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
@@ -280,8 +293,11 @@ class _ScanScreenState extends State<ScanScreen> {
         Expanded(
           child: ElevatedButton.icon(
             onPressed: _isProcessing ? null : _processImage,
-            icon: _isProcessing 
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            icon: _isProcessing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.auto_awesome_rounded),
             label: Text(_isProcessing ? 'Processing...' : 'Detect'),
             style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
@@ -291,63 +307,17 @@ class _ScanScreenState extends State<ScanScreen> {
     );
   }
 
-  // Re-used helper from your new version for the bottom sheet
-  Widget _buildResultsSheet() {
-    final summary = _scanner.getDetectionSummary(_detectionResults!);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.surfaceDark : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        children: [
-          Container(margin: const EdgeInsets.only(top: 12, bottom: 8), width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(gradient: AppTheme.accentGradient, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.restaurant_rounded, color: Colors.white)),
-                const SizedBox(width: 12),
-                Text('Detected Items', style: Theme.of(context).textTheme.titleLarge),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: summary.length,
-              itemBuilder: (context, index) {
-                final entry = summary.entries.elementAt(index);
-                return Card(
-                  child: ListTile(
-                    title: Text(entry.key, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    trailing: Text('x${entry.value}', style: const TextStyle(color: AppTheme.primaryPurple, fontWeight: FontWeight.bold)),
-                  ),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _addToPantry();
-              },
-              child: const Center(child: Text('Add to Pantry')),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _addToPantry() {
+    final activeItems = _detectedItems.where((item) => !item.isDeleted).toList();
+    
+    // TODO: Add items to pantry service here
+    // For now, just show success message
+    
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Added ${_detectionResults?.length ?? 0} items!'), backgroundColor: AppTheme.successGreen),
+      SnackBar(
+        content: Text('Added ${activeItems.length} items to pantry!'),
+        backgroundColor: AppTheme.successGreen,
+      ),
     );
     _retake();
   }
@@ -356,7 +326,9 @@ class _ScanScreenState extends State<ScanScreen> {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isDark ? [AppTheme.backgroundDark, AppTheme.surfaceDark] : [AppTheme.backgroundLight, Colors.white],
+          colors: isDark
+              ? [AppTheme.backgroundDark, AppTheme.surfaceDark]
+              : [AppTheme.backgroundLight, Colors.white],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),
@@ -365,10 +337,504 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: AppTheme.errorRed));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppTheme.errorRed),
+    );
   }
 
   void _showWarningSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: AppTheme.warningYellow));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppTheme.warningYellow),
+    );
+  }
+}
+
+// Detection Results Sheet Widget
+class _DetectionResultsSheet extends StatefulWidget {
+  final List<DetectedItem> detectedItems;
+  final Function(List<DetectedItem>) onItemsUpdated;
+  final VoidCallback onConfirm;
+  final VoidCallback onCancel;
+
+  const _DetectionResultsSheet({
+    required this.detectedItems,
+    required this.onItemsUpdated,
+    required this.onConfirm,
+    required this.onCancel,
+  });
+
+  @override
+  State<_DetectionResultsSheet> createState() => _DetectionResultsSheetState();
+}
+
+class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
+  late List<DetectedItem> _items;
+
+  @override
+  void initState() {
+    super.initState();
+    _items = List.from(widget.detectedItems);
+  }
+
+  void _updateItem(DetectedItem updatedItem) {
+    setState(() {
+      final index = _items.indexWhere((item) => item.id == updatedItem.id);
+      if (index != -1) {
+        _items[index] = updatedItem;
+        widget.onItemsUpdated(_items);
+      }
+    });
+  }
+
+  void _deleteItem(String id) {
+    setState(() {
+      final index = _items.indexWhere((item) => item.id == id);
+      if (index != -1) {
+        _items[index] = _items[index].copyWith(isDeleted: true);
+        widget.onItemsUpdated(_items);
+      }
+    });
+  }
+
+  void _showEditDialog(DetectedItem item) {
+    final nameController = TextEditingController(text: item.name);
+    final quantityController = TextEditingController(text: item.quantity);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Item'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                prefixIcon: Icon(Icons.label),
+              ),
+              textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: quantityController,
+              decoration: const InputDecoration(
+                labelText: 'Quantity',
+                prefixIcon: Icon(Icons.numbers),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final updatedItem = item.copyWith(
+                name: nameController.text.trim(),
+                quantity: quantityController.text.trim(),
+                isManuallyEdited: true,
+              );
+              _updateItem(updatedItem);
+              Navigator.pop(context);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final activeItems = _items.where((item) => !item.isDeleted).toList();
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.surfaceDark : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.accentGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.restaurant_rounded, color: Colors.white),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Detected Items',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      Text(
+                        '${activeItems.length} ${activeItems.length == 1 ? 'item' : 'items'} found',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: widget.onCancel,
+                  icon: const Icon(Icons.close),
+                  style: IconButton.styleFrom(
+                    backgroundColor: isDark ? AppTheme.cardDark : Colors.grey.shade100,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Info message
+          if (activeItems.any((item) => item.confidenceLevel == ConfidenceLevel.low))
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.warningYellow.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.warningYellow.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: AppTheme.warningYellow, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Some items have low confidence. Please review and edit if needed.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          // Items list
+          Expanded(
+            child: activeItems.isEmpty
+                ? _buildEmptyState()
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: activeItems.length,
+                    itemBuilder: (context, index) {
+                      final item = activeItems[index];
+                      return _DetectedItemCard(
+                        item: item,
+                        onEdit: () => _showEditDialog(item),
+                        onDelete: () => _deleteItem(item.id),
+                      );
+                    },
+                  ),
+          ),
+          
+          // Bottom actions
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.cardDark : Colors.grey.shade50,
+              border: Border(
+                top: BorderSide(
+                  color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
+                ),
+              ),
+            ),
+            child: SafeArea(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: widget.onCancel,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: activeItems.isEmpty ? null : widget.onConfirm,
+                      icon: const Icon(Icons.add_shopping_cart),
+                      label: Text('Add ${activeItems.length} to Pantry'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.delete_sweep,
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'All items removed',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Colors.grey.shade600,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Scan again to detect more items',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey.shade500,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Individual item card widget
+class _DetectedItemCard extends StatelessWidget {
+  final DetectedItem item;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _DetectedItemCard({
+    required this.item,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            // Confidence indicator
+            _buildConfidenceIndicator(),
+            const SizedBox(width: 12),
+            
+            // Item details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (item.isManuallyEdited)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.infoBlue.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.edit,
+                                size: 10,
+                                color: AppTheme.infoBlue,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                'Edited',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppTheme.infoBlue,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.inventory_2,
+                        size: 14,
+                        color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Qty: ${item.quantity}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      _buildConfidenceBadge(),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            
+            // Actions
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit),
+                  iconSize: 20,
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppTheme.infoBlue.withValues(alpha: 0.1),
+                    foregroundColor: AppTheme.infoBlue,
+                  ),
+                  tooltip: 'Edit',
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.close),
+                  iconSize: 20,
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppTheme.errorRed.withValues(alpha: 0.1),
+                    foregroundColor: AppTheme.errorRed,
+                  ),
+                  tooltip: 'Remove',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConfidenceIndicator() {
+    Color color;
+    IconData icon;
+
+    switch (item.confidenceLevel) {
+      case ConfidenceLevel.high:
+        color = AppTheme.successGreen;
+        icon = Icons.check_circle;
+        break;
+      case ConfidenceLevel.medium:
+        color = AppTheme.warningYellow;
+        icon = Icons.warning;
+        break;
+      case ConfidenceLevel.low:
+        color = AppTheme.errorRed;
+        icon = Icons.error;
+        break;
+    }
+
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, color: color, size: 24),
+    );
+  }
+
+  Widget _buildConfidenceBadge() {
+    Color color;
+    String label;
+
+    switch (item.confidenceLevel) {
+      case ConfidenceLevel.high:
+        color = AppTheme.successGreen;
+        label = 'High';
+        break;
+      case ConfidenceLevel.medium:
+        color = AppTheme.warningYellow;
+        label = 'Medium';
+        break;
+      case ConfidenceLevel.low:
+        color = AppTheme.errorRed;
+        label = 'Low';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${item.confidencePercentage}%',
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
