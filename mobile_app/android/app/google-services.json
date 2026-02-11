@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "511766741775",
+    "project_id": "piatra-fc1d6",
+    "storage_bucket": "piatra-fc1d6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:511766741775:android:2245b1b8996424b4feb47a",
+        "android_client_info": {
+          "package_name": "com.example.piatra"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAeUpC2ZyOvpQmKAEWHFZoswjZCoOaKLhQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

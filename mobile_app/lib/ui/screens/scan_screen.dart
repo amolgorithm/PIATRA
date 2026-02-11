@@ -8,6 +8,8 @@ import '../widgets/theme_toggle_fab.dart';
 import '../../ml/pantry_scanner.dart';
 import '../../ml/detection_result.dart';
 import '../../models/detected_item.dart';
+import '../../models/pantry_item.dart';
+import '../../services/pantry_sync_manager.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -307,19 +309,105 @@ class _ScanScreenState extends State<ScanScreen> {
     );
   }
 
-  void _addToPantry() {
+  Future<void> _addToPantry() async {
     final activeItems = _detectedItems.where((item) => !item.isDeleted).toList();
     
-    // TODO: Add items to pantry service here
-    // For now, just show success message
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Added ${activeItems.length} items to pantry!'),
-        backgroundColor: AppTheme.successGreen,
+    if (activeItems.isEmpty) {
+      Navigator.pop(context);
+      return;
+    }
+
+    // Show loading indicator
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
       ),
     );
-    _retake();
+
+    try {
+      // Add each item to the pantry using PantrySyncManager
+      for (final item in activeItems) {
+        final pantryItem = PantryItem(
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          category: _categorizeItem(item.name),
+          expiryDate: null, // Can be set later by user
+          imageUrl: null,
+        );
+        
+        // Add to local SQLite and sync to Firebase
+        await PantrySyncManager.instance.addItem(pantryItem, push: true);
+      }
+
+      if (!mounted) return;
+      
+      // Close loading dialog
+      Navigator.pop(context);
+      
+      // Close results sheet
+      Navigator.pop(context);
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Added ${activeItems.length} ${activeItems.length == 1 ? 'item' : 'items'} to pantry!'),
+          backgroundColor: AppTheme.successGreen,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      
+      // Reset for next scan
+      _retake();
+      
+    } catch (e) {
+      if (!mounted) return;
+      
+      // Close loading dialog
+      Navigator.pop(context);
+      
+      _showErrorSnackBar('Error adding items: $e');
+    }
+  }
+
+  /// Categorize item based on name
+  String _categorizeItem(String name) {
+    final lowerName = name.toLowerCase();
+    
+    // Vegetables
+    if (['broccoli', 'carrot', 'lettuce', 'tomato', 'cucumber', 'pepper', 'onion'].any((v) => lowerName.contains(v))) {
+      return 'Vegetables';
+    }
+    
+    // Fruits
+    if (['apple', 'banana', 'orange', 'grape', 'berry', 'lemon', 'lime'].any((f) => lowerName.contains(f))) {
+      return 'Fruits';
+    }
+    
+    // Dairy
+    if (['milk', 'cheese', 'yogurt', 'butter', 'cream'].any((d) => lowerName.contains(d))) {
+      return 'Dairy';
+    }
+    
+    // Meat
+    if (['chicken', 'beef', 'pork', 'fish', 'turkey', 'meat'].any((m) => lowerName.contains(m))) {
+      return 'Meat';
+    }
+    
+    // Beverages
+    if (['bottle', 'drink', 'juice', 'soda', 'water', 'wine', 'beer'].any((b) => lowerName.contains(b))) {
+      return 'Beverages';
+    }
+    
+    // Bakery
+    if (['bread', 'cake', 'donut', 'pizza', 'sandwich'].any((b) => lowerName.contains(b))) {
+      return 'Bakery';
+    }
+    
+    return 'Other';
   }
 
   Widget _buildBackground(bool isDark) {
