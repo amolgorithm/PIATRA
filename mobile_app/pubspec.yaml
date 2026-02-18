@@ -36,6 +36,7 @@ dependencies:
   
   # ML
   tflite_flutter: ^0.11.0
+  google_mlkit_image_labeling: ^0.13.0
   
   # Utils
   intl: ^0.18.1
@@ -50,7 +51,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
-  # Assets
-  assets:
-    - assets/models/pantry_model.tflite

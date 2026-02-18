@@ -206,6 +206,18 @@
       "languageVersion": "3.9"
     },
     {
+      "name": "google_mlkit_commons",
+      "rootUri": "file:///C:/Users/Amol/AppData/Local/Pub/Cache/hosted/pub.dev/google_mlkit_commons-0.9.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.16"
+    },
+    {
+      "name": "google_mlkit_image_labeling",
+      "rootUri": "file:///C:/Users/Amol/AppData/Local/Pub/Cache/hosted/pub.dev/google_mlkit_image_labeling-0.13.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.16"
+    },
+    {
       "name": "hooks",
       "rootUri": "file:///C:/Users/Amol/AppData/Local/Pub/Cache/hosted/pub.dev/hooks-1.0.1",
       "packageUri": "lib/",

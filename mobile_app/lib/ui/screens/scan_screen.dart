@@ -1,3 +1,4 @@
+// lib/ui/screens/scan_screen.dart
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -19,8 +20,8 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  // ML & Processing State
   bool _isProcessing = false;
+  String? _statusMessage;
   XFile? _capturedImage;
   final ImagePicker _imagePicker = ImagePicker();
   final PantryScanner _scanner = PantryScanner();
@@ -29,15 +30,22 @@ class _ScanScreenState extends State<ScanScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeScanner();
+    _initScanner();
   }
 
-  Future<void> _initializeScanner() async {
+  Future<void> _initScanner() async {
     try {
       await _scanner.initialize();
-      debugPrint('Scanner initialized successfully');
     } catch (e) {
-      debugPrint('Error initializing scanner: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('⚠️ ML model failed to load: $e'),
+            backgroundColor: AppTheme.errorRed,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
     }
   }
 
@@ -50,17 +58,15 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _takePicture() async {
     setState(() => _isProcessing = true);
     try {
-      final XFile? image = await _imagePicker.pickImage(
+      final image = await _imagePicker.pickImage(
         source: ImageSource.camera,
         maxWidth: 1920,
         maxHeight: 1080,
         imageQuality: 85,
       );
-      if (image != null) {
-        setState(() => _capturedImage = image);
-      }
+      if (image != null) setState(() => _capturedImage = image);
     } catch (e) {
-      _showErrorSnackBar('Error accessing camera: $e');
+      _showErrorSnackBar('Camera error: $e');
     } finally {
       setState(() => _isProcessing = false);
     }
@@ -69,17 +75,15 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _pickFromGallery() async {
     setState(() => _isProcessing = true);
     try {
-      final XFile? image = await _imagePicker.pickImage(
+      final image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 1920,
         maxHeight: 1080,
         imageQuality: 85,
       );
-      if (image != null) {
-        setState(() => _capturedImage = image);
-      }
+      if (image != null) setState(() => _capturedImage = image);
     } catch (e) {
-      _showErrorSnackBar('Error picking image: $e');
+      _showErrorSnackBar('Gallery error: $e');
     } finally {
       setState(() => _isProcessing = false);
     }
@@ -89,13 +93,17 @@ class _ScanScreenState extends State<ScanScreen> {
     setState(() {
       _capturedImage = null;
       _detectedItems = [];
+      _statusMessage = null;
     });
   }
 
   Future<void> _processImage() async {
     if (_capturedImage == null) return;
 
-    setState(() => _isProcessing = true);
+    setState(() {
+      _isProcessing = true;
+      _statusMessage = 'Identifying food items…';
+    });
 
     try {
       final results = await _scanner.detectObjects(_capturedImage!.path);
@@ -105,19 +113,27 @@ class _ScanScreenState extends State<ScanScreen> {
         _detectedItems = foodItems
             .asMap()
             .entries
-            .map((entry) => DetectedItem.fromDetection(entry.value, index: entry.key))
+            .map((e) => DetectedItem.fromDetection(e.value, index: e.key))
             .toList();
         _isProcessing = false;
+        _statusMessage = null;
       });
 
       if (_detectedItems.isEmpty) {
-        _showWarningSnackBar('No food items detected. Try better lighting.');
+        _showWarningSnackBar(
+          results.isEmpty
+              ? 'Nothing detected. Try better lighting or a closer shot.'
+              : 'No food found in image. Make sure food is clearly visible.',
+        );
       } else {
         _showDetectionResults();
       }
     } catch (e) {
-      setState(() => _isProcessing = false);
-      _showErrorSnackBar('Error processing image: $e');
+      setState(() {
+        _isProcessing = false;
+        _statusMessage = null;
+      });
+      _showErrorSnackBar('Detection failed: $e');
     }
   }
 
@@ -130,13 +146,84 @@ class _ScanScreenState extends State<ScanScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => _DetectionResultsSheet(
         detectedItems: _detectedItems,
-        onItemsUpdated: (updatedItems) {
-          setState(() => _detectedItems = updatedItems);
-        },
+        onItemsUpdated: (updated) => setState(() => _detectedItems = updated),
         onConfirm: _addToPantry,
         onCancel: () => Navigator.pop(context),
       ),
     );
+  }
+
+  Future<void> _addToPantry() async {
+    final activeItems = _detectedItems.where((i) => !i.isDeleted).toList();
+    if (activeItems.isEmpty) {
+      Navigator.pop(context);
+      return;
+    }
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      for (final item in activeItems) {
+        await PantrySyncManager.instance.addItem(
+          PantryItem(
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            category: _categorize(item.name),
+          ),
+          push: true,
+        );
+      }
+      if (!mounted) return;
+      Navigator.pop(context); // loader
+      Navigator.pop(context); // sheet
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              '✅ Added ${activeItems.length} item${activeItems.length == 1 ? '' : 's'} to pantry!'),
+          backgroundColor: AppTheme.successGreen,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      _retake();
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      _showErrorSnackBar('Error saving: $e');
+    }
+  }
+
+  String _categorize(String name) {
+    final n = name.toLowerCase();
+    if (['salad', 'broccoli', 'carrot', 'onion', 'tomato', 'cucumber',
+        'spinach', 'lettuce', 'pepper', 'vegetable', 'zucchini',
+        'eggplant', 'potato', 'garlic', 'celery', 'kale', 'mushroom']
+        .any(n.contains)) return 'Vegetables';
+    if (['apple', 'banana', 'orange', 'berry', 'grape', 'mango',
+        'pineapple', 'watermelon', 'peach', 'pear', 'cherry',
+        'lemon', 'lime', 'melon', 'fruit', 'avocado', 'coconut']
+        .any(n.contains)) return 'Fruits';
+    if (['milk', 'cheese', 'yogurt', 'butter', 'cream', 'egg',
+        'dairy', 'cottage', 'custard']
+        .any(n.contains)) return 'Dairy';
+    if (['chicken', 'beef', 'pork', 'fish', 'salmon', 'tuna', 'shrimp',
+        'turkey', 'lamb', 'sausage', 'bacon', 'ham', 'meat', 'steak']
+        .any(n.contains)) return 'Meat';
+    if (['bread', 'cake', 'donut', 'pizza', 'cookie', 'muffin',
+        'croissant', 'bagel', 'pastry', 'biscuit', 'waffle', 'pancake']
+        .any(n.contains)) return 'Bakery';
+    if (['juice', 'soda', 'coffee', 'tea', 'water', 'wine', 'beer',
+        'smoothie', 'latte', 'drink', 'beverage', 'cocktail']
+        .any(n.contains)) return 'Beverages';
+    if (['rice', 'pasta', 'noodle', 'bread', 'cereal', 'oat', 'flour',
+        'quinoa', 'lentil', 'bean', 'chickpea', 'tortilla', 'wrap']
+        .any(n.contains)) return 'Grains & Legumes';
+    return 'Other';
   }
 
   @override
@@ -146,21 +233,21 @@ class _ScanScreenState extends State<ScanScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          _buildBackground(isDark),
+          _buildBg(isDark),
           SafeArea(
             child: Column(
               children: [
                 _buildAppBar(isDark),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(16),
                     child: _capturedImage != null
-                        ? _buildCapturedImage()
+                        ? _buildImagePreview()
                         : _buildInstructions(isDark),
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.all(24.0),
+                  padding: const EdgeInsets.all(24),
                   child: _capturedImage != null
                       ? _buildReviewControls()
                       : _buildCaptureControls(),
@@ -177,7 +264,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Widget _buildAppBar(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.all(20),
       child: Row(
         children: [
           IconButton(
@@ -192,13 +279,14 @@ class _ScanScreenState extends State<ScanScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Scan Ingredient', style: Theme.of(context).textTheme.headlineMedium),
+                Text('Scan Ingredients',
+                    style: Theme.of(context).textTheme.headlineMedium),
                 Text(
                   _capturedImage == null
-                      ? 'Choose how to add image'
+                      ? 'Photo or gallery'
                       : _isProcessing
-                          ? 'Processing...'
-                          : 'Review and confirm',
+                          ? (_statusMessage ?? 'Processing…')
+                          : 'Review detected items',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -214,7 +302,8 @@ class _ScanScreenState extends State<ScanScreen> {
       decoration: BoxDecoration(
         color: isDark ? AppTheme.cardDark : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1)),
+        border: Border.all(
+            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1)),
       ),
       child: Center(
         child: Column(
@@ -222,18 +311,22 @@ class _ScanScreenState extends State<ScanScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(gradient: AppTheme.primaryGradient, shape: BoxShape.circle),
-              child: const Icon(Icons.camera_alt_rounded, size: 80, color: Colors.white),
+              decoration: const BoxDecoration(
+                  gradient: AppTheme.primaryGradient, shape: BoxShape.circle),
+              child: const Icon(Icons.camera_alt_rounded,
+                  size: 80, color: Colors.white),
             ),
             const SizedBox(height: 32),
-            Text('Ready to Scan', style: Theme.of(context).textTheme.headlineMedium),
+            Text('Scan Your Pantry',
+                style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 12),
-            Text(
-              kIsWeb
-                  ? 'Click "Take Photo" for camera\nor "Gallery" for local files'
-                  : 'Snap a photo or pick from gallery',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'Point at any food item or ingredient.\nAI identifies ~2000 food types on-device.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
             ),
           ],
         ),
@@ -241,12 +334,38 @@ class _ScanScreenState extends State<ScanScreen> {
     );
   }
 
-  Widget _buildCapturedImage() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: kIsWeb
-          ? Image.network(_capturedImage!.path, fit: BoxFit.contain)
-          : Image.file(File(_capturedImage!.path), fit: BoxFit.contain),
+  Widget _buildImagePreview() {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: kIsWeb
+              ? Image.network(_capturedImage!.path,
+                  fit: BoxFit.contain, width: double.infinity)
+              : Image.file(File(_capturedImage!.path),
+                  fit: BoxFit.contain, width: double.infinity),
+        ),
+        if (_isProcessing)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(color: Colors.white),
+                  const SizedBox(height: 16),
+                  Text(
+                    _statusMessage ?? 'Processing…',
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -260,7 +379,8 @@ class _ScanScreenState extends State<ScanScreen> {
             label: const Text('Gallery'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 18),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
             ),
           ),
         ),
@@ -270,7 +390,8 @@ class _ScanScreenState extends State<ScanScreen> {
             onPressed: _isProcessing ? null : _takePicture,
             icon: const Icon(Icons.camera_alt_rounded),
             label: const Text('Take Photo'),
-            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 18)),
+            style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 18)),
           ),
         ),
       ],
@@ -287,7 +408,8 @@ class _ScanScreenState extends State<ScanScreen> {
             label: const Text('Retake'),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
             ),
           ),
         ),
@@ -297,120 +419,20 @@ class _ScanScreenState extends State<ScanScreen> {
             onPressed: _isProcessing ? null : _processImage,
             icon: _isProcessing
                 ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    width: 16, height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.auto_awesome_rounded),
-            label: Text(_isProcessing ? 'Processing...' : 'Detect'),
-            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+            label: Text(_isProcessing ? 'Detecting…' : 'Identify Food'),
+            style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16)),
           ),
         ),
       ],
     );
   }
 
-  Future<void> _addToPantry() async {
-    final activeItems = _detectedItems.where((item) => !item.isDeleted).toList();
-    
-    if (activeItems.isEmpty) {
-      Navigator.pop(context);
-      return;
-    }
-
-    // Show loading indicator
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
-
-    try {
-      // Add each item to the pantry using PantrySyncManager
-      for (final item in activeItems) {
-        final pantryItem = PantryItem(
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity,
-          category: _categorizeItem(item.name),
-          expiryDate: null, // Can be set later by user
-          imageUrl: null,
-        );
-        
-        // Add to local SQLite and sync to Firebase
-        await PantrySyncManager.instance.addItem(pantryItem, push: true);
-      }
-
-      if (!mounted) return;
-      
-      // Close loading dialog
-      Navigator.pop(context);
-      
-      // Close results sheet
-      Navigator.pop(context);
-      
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ Added ${activeItems.length} ${activeItems.length == 1 ? 'item' : 'items'} to pantry!'),
-          backgroundColor: AppTheme.successGreen,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-      
-      // Reset for next scan
-      _retake();
-      
-    } catch (e) {
-      if (!mounted) return;
-      
-      // Close loading dialog
-      Navigator.pop(context);
-      
-      _showErrorSnackBar('Error adding items: $e');
-    }
-  }
-
-  /// Categorize item based on name
-  String _categorizeItem(String name) {
-    final lowerName = name.toLowerCase();
-    
-    // Vegetables
-    if (['broccoli', 'carrot', 'lettuce', 'tomato', 'cucumber', 'pepper', 'onion'].any((v) => lowerName.contains(v))) {
-      return 'Vegetables';
-    }
-    
-    // Fruits
-    if (['apple', 'banana', 'orange', 'grape', 'berry', 'lemon', 'lime'].any((f) => lowerName.contains(f))) {
-      return 'Fruits';
-    }
-    
-    // Dairy
-    if (['milk', 'cheese', 'yogurt', 'butter', 'cream'].any((d) => lowerName.contains(d))) {
-      return 'Dairy';
-    }
-    
-    // Meat
-    if (['chicken', 'beef', 'pork', 'fish', 'turkey', 'meat'].any((m) => lowerName.contains(m))) {
-      return 'Meat';
-    }
-    
-    // Beverages
-    if (['bottle', 'drink', 'juice', 'soda', 'water', 'wine', 'beer'].any((b) => lowerName.contains(b))) {
-      return 'Beverages';
-    }
-    
-    // Bakery
-    if (['bread', 'cake', 'donut', 'pizza', 'sandwich'].any((b) => lowerName.contains(b))) {
-      return 'Bakery';
-    }
-    
-    return 'Other';
-  }
-
-  Widget _buildBackground(bool isDark) {
+  Widget _buildBg(bool isDark) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -424,20 +446,17 @@ class _ScanScreenState extends State<ScanScreen> {
     );
   }
 
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppTheme.errorRed),
-    );
-  }
+  void _showErrorSnackBar(String msg) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppTheme.errorRed));
 
-  void _showWarningSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppTheme.warningYellow),
-    );
-  }
+  void _showWarningSnackBar(String msg) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppTheme.warningYellow));
 }
 
-// Detection Results Sheet Widget
+// ─────────────────────────────────────────────────────────────────────────────
+// Detection Results Sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _DetectionResultsSheet extends StatefulWidget {
   final List<DetectedItem> detectedItems;
   final Function(List<DetectedItem>) onItemsUpdated;
@@ -464,11 +483,11 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
     _items = List.from(widget.detectedItems);
   }
 
-  void _updateItem(DetectedItem updatedItem) {
+  void _updateItem(DetectedItem updated) {
     setState(() {
-      final index = _items.indexWhere((item) => item.id == updatedItem.id);
-      if (index != -1) {
-        _items[index] = updatedItem;
+      final idx = _items.indexWhere((i) => i.id == updated.id);
+      if (idx != -1) {
+        _items[idx] = updated;
         widget.onItemsUpdated(_items);
       }
     });
@@ -476,57 +495,49 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
 
   void _deleteItem(String id) {
     setState(() {
-      final index = _items.indexWhere((item) => item.id == id);
-      if (index != -1) {
-        _items[index] = _items[index].copyWith(isDeleted: true);
+      final idx = _items.indexWhere((i) => i.id == id);
+      if (idx != -1) {
+        _items[idx] = _items[idx].copyWith(isDeleted: true);
         widget.onItemsUpdated(_items);
       }
     });
   }
 
   void _showEditDialog(DetectedItem item) {
-    final nameController = TextEditingController(text: item.name);
-    final quantityController = TextEditingController(text: item.quantity);
-
+    final nameCtrl = TextEditingController(text: item.name);
+    final qtyCtrl = TextEditingController(text: item.quantity);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Edit Item'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
-              controller: nameController,
+              controller: nameCtrl,
               decoration: const InputDecoration(
-                labelText: 'Name',
-                prefixIcon: Icon(Icons.label),
-              ),
+                  labelText: 'Name', prefixIcon: Icon(Icons.label)),
               textCapitalization: TextCapitalization.words,
             ),
             const SizedBox(height: 16),
             TextField(
-              controller: quantityController,
+              controller: qtyCtrl,
               decoration: const InputDecoration(
-                labelText: 'Quantity',
-                prefixIcon: Icon(Icons.numbers),
-              ),
+                  labelText: 'Quantity', prefixIcon: Icon(Icons.numbers)),
             ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
-              final updatedItem = item.copyWith(
-                name: nameController.text.trim(),
-                quantity: quantityController.text.trim(),
+              _updateItem(item.copyWith(
+                name: nameCtrl.text.trim(),
+                quantity: qtyCtrl.text.trim(),
                 isManuallyEdited: true,
-              );
-              _updateItem(updatedItem);
-              Navigator.pop(context);
+              ));
+              Navigator.pop(ctx);
             },
             child: const Text('Save'),
           ),
@@ -538,7 +549,7 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final activeItems = _items.where((item) => !item.isDeleted).toList();
+    final active = _items.where((i) => !i.isDeleted).toList();
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
@@ -548,28 +559,24 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
       ),
       child: Column(
         children: [
-          // Handle
+          // Handle bar
           Container(
             margin: const EdgeInsets.only(top: 12, bottom: 8),
-            width: 40,
-            height: 4,
+            width: 40, height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
-            ),
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2)),
           ),
-          
           // Header
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    gradient: AppTheme.accentGradient,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                      gradient: AppTheme.accentGradient,
+                      borderRadius: BorderRadius.circular(12)),
                   child: const Icon(Icons.restaurant_rounded, color: Colors.white),
                 ),
                 const SizedBox(width: 12),
@@ -577,14 +584,10 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Detected Items',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      Text(
-                        '${activeItems.length} ${activeItems.length == 1 ? 'item' : 'items'} found',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+                      Text('Detected Items',
+                          style: Theme.of(context).textTheme.titleLarge),
+                      Text('${active.length} food item${active.length == 1 ? '' : 's'} found',
+                          style: Theme.of(context).textTheme.bodySmall),
                     ],
                   ),
                 ),
@@ -592,22 +595,22 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
                   onPressed: widget.onCancel,
                   icon: const Icon(Icons.close),
                   style: IconButton.styleFrom(
-                    backgroundColor: isDark ? AppTheme.cardDark : Colors.grey.shade100,
-                  ),
+                      backgroundColor:
+                          isDark ? AppTheme.cardDark : Colors.grey.shade100),
                 ),
               ],
             ),
           ),
-          
-          // Info message
-          if (activeItems.any((item) => item.confidenceLevel == ConfidenceLevel.low))
+          // Warning for low confidence items
+          if (active.any((i) => i.confidenceLevel == ConfidenceLevel.low))
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: AppTheme.warningYellow.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.warningYellow.withValues(alpha: 0.3)),
+                border: Border.all(
+                    color: AppTheme.warningYellow.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -615,7 +618,7 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Some items have low confidence. Please review and edit if needed.',
+                      'Some items have low confidence — tap the edit icon to rename.',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
@@ -625,35 +628,40 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
                 ],
               ),
             ),
-          
-          // Items list
+          // List
           Expanded(
-            child: activeItems.isEmpty
-                ? _buildEmptyState()
+            child: active.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.delete_sweep, size: 64, color: Colors.grey.shade400),
+                        const SizedBox(height: 16),
+                        Text('All items removed',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: Colors.grey.shade600)),
+                      ],
+                    ),
+                  )
                 : ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: activeItems.length,
-                    itemBuilder: (context, index) {
-                      final item = activeItems[index];
-                      return _DetectedItemCard(
-                        item: item,
-                        onEdit: () => _showEditDialog(item),
-                        onDelete: () => _deleteItem(item.id),
-                      );
-                    },
+                    itemCount: active.length,
+                    itemBuilder: (_, i) => _DetectedItemCard(
+                      item: active[i],
+                      onEdit: () => _showEditDialog(active[i]),
+                      onDelete: () => _deleteItem(active[i].id),
+                    ),
                   ),
           ),
-          
-          // Bottom actions
+          // Bottom bar
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: isDark ? AppTheme.cardDark : Colors.grey.shade50,
               border: Border(
-                top: BorderSide(
-                  color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
-                ),
-              ),
+                  top: BorderSide(
+                      color: (isDark ? Colors.white : Colors.black)
+                          .withValues(alpha: 0.1))),
             ),
             child: SafeArea(
               child: Row(
@@ -662,8 +670,7 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
                     child: OutlinedButton(
                       onPressed: widget.onCancel,
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
+                          padding: const EdgeInsets.symmetric(vertical: 16)),
                       child: const Text('Cancel'),
                     ),
                   ),
@@ -671,12 +678,11 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton.icon(
-                      onPressed: activeItems.isEmpty ? null : widget.onConfirm,
+                      onPressed: active.isEmpty ? null : widget.onConfirm,
                       icon: const Icon(Icons.add_shopping_cart),
-                      label: Text('Add ${activeItems.length} to Pantry'),
+                      label: Text('Add ${active.length} to Pantry'),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
+                          padding: const EdgeInsets.symmetric(vertical: 16)),
                     ),
                   ),
                 ],
@@ -687,38 +693,12 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
       ),
     );
   }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.delete_sweep,
-            size: 64,
-            color: Colors.grey.shade400,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'All items removed',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Scan again to detect more items',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey.shade500,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
-// Individual item card widget
+// ─────────────────────────────────────────────────────────────────────────────
+// Individual item card
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _DetectedItemCard extends StatelessWidget {
   final DetectedItem item;
   final VoidCallback onEdit;
@@ -734,17 +714,43 @@ class _DetectedItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    Color indicatorColor;
+    IconData indicatorIcon;
+    String confidenceLabel;
+    switch (item.confidenceLevel) {
+      case ConfidenceLevel.high:
+        indicatorColor = AppTheme.successGreen;
+        indicatorIcon = Icons.check_circle;
+        confidenceLabel = 'High';
+        break;
+      case ConfidenceLevel.medium:
+        indicatorColor = AppTheme.warningYellow;
+        indicatorIcon = Icons.warning;
+        confidenceLabel = 'Medium';
+        break;
+      case ConfidenceLevel.low:
+        indicatorColor = AppTheme.errorRed;
+        indicatorIcon = Icons.error;
+        confidenceLabel = 'Low';
+        break;
+    }
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            // Confidence indicator
-            _buildConfidenceIndicator(),
+            // Confidence circle
+            Container(
+              width: 48, height: 48,
+              decoration: BoxDecoration(
+                  color: indicatorColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12)),
+              child: Icon(indicatorIcon, color: indicatorColor, size: 24),
+            ),
             const SizedBox(width: 12),
-            
-            // Item details
+            // Name + meta
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -752,67 +758,62 @@ class _DetectedItemCard extends StatelessWidget {
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          item.name,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: Text(item.name,
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w600)),
                       ),
                       if (item.isManuallyEdited)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: AppTheme.infoBlue.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.edit,
-                                size: 10,
-                                color: AppTheme.infoBlue,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                'Edited',
-                                style: TextStyle(
+                          child: Text('Edited',
+                              style: TextStyle(
                                   fontSize: 10,
                                   color: AppTheme.infoBlue,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
+                                  fontWeight: FontWeight.w600)),
                         ),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(
-                        Icons.inventory_2,
-                        size: 14,
-                        color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight,
-                      ),
+                      Icon(Icons.inventory_2,
+                          size: 13,
+                          color: isDark
+                              ? AppTheme.textSecondaryDark
+                              : AppTheme.textSecondaryLight),
                       const SizedBox(width: 4),
-                      Text(
-                        'Qty: ${item.quantity}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight,
+                      Text('Qty: ${item.quantity}',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppTheme.textSecondaryDark
+                                  : AppTheme.textSecondaryLight)),
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: indicatorColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${item.confidencePercentage}% $confidenceLabel',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: indicatorColor,
+                              fontWeight: FontWeight.bold),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      _buildConfidenceBadge(),
                     ],
                   ),
                 ],
               ),
             ),
-            
             // Actions
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -825,7 +826,6 @@ class _DetectedItemCard extends StatelessWidget {
                     backgroundColor: AppTheme.infoBlue.withValues(alpha: 0.1),
                     foregroundColor: AppTheme.infoBlue,
                   ),
-                  tooltip: 'Edit',
                 ),
                 const SizedBox(width: 4),
                 IconButton(
@@ -836,92 +836,11 @@ class _DetectedItemCard extends StatelessWidget {
                     backgroundColor: AppTheme.errorRed.withValues(alpha: 0.1),
                     foregroundColor: AppTheme.errorRed,
                   ),
-                  tooltip: 'Remove',
                 ),
               ],
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildConfidenceIndicator() {
-    Color color;
-    IconData icon;
-
-    switch (item.confidenceLevel) {
-      case ConfidenceLevel.high:
-        color = AppTheme.successGreen;
-        icon = Icons.check_circle;
-        break;
-      case ConfidenceLevel.medium:
-        color = AppTheme.warningYellow;
-        icon = Icons.warning;
-        break;
-      case ConfidenceLevel.low:
-        color = AppTheme.errorRed;
-        icon = Icons.error;
-        break;
-    }
-
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Icon(icon, color: color, size: 24),
-    );
-  }
-
-  Widget _buildConfidenceBadge() {
-    Color color;
-    String label;
-
-    switch (item.confidenceLevel) {
-      case ConfidenceLevel.high:
-        color = AppTheme.successGreen;
-        label = 'High';
-        break;
-      case ConfidenceLevel.medium:
-        color = AppTheme.warningYellow;
-        label = 'Medium';
-        break;
-      case ConfidenceLevel.low:
-        color = AppTheme.errorRed;
-        label = 'Low';
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${item.confidencePercentage}%',
-            style: TextStyle(
-              fontSize: 11,
-              color: color,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(width: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }
