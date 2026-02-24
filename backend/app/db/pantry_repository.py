@@ -1,0 +1,1 @@
+# Pantry repository for managing pantry items

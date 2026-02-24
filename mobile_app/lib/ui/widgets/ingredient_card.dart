@@ -62,7 +62,7 @@ class IngredientCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppTheme.errorRed.withValues(alpha: 0.1),
+                    color: AppTheme.errorRed.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -117,7 +117,7 @@ class IngredientCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+        color: AppTheme.primaryGreen.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Icon(
@@ -134,7 +134,7 @@ class IngredientCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: _getExpiryColor().withValues(alpha: 0.1),
+        color: _getExpiryColor().withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(

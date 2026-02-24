@@ -303,7 +303,7 @@ class _ScanScreenState extends State<ScanScreen> {
         color: isDark ? AppTheme.cardDark : Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-            color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1)),
+            color: (isDark ? Colors.white : Colors.black).withOpacity(0.1)),
       ),
       child: Center(
         child: Column(
@@ -607,10 +607,10 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
               margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppTheme.warningYellow.withValues(alpha: 0.1),
+                color: AppTheme.warningYellow.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: AppTheme.warningYellow.withValues(alpha: 0.3)),
+                    color: AppTheme.warningYellow.withOpacity(0.3)),
               ),
               child: Row(
                 children: [
@@ -661,7 +661,7 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
               border: Border(
                   top: BorderSide(
                       color: (isDark ? Colors.white : Colors.black)
-                          .withValues(alpha: 0.1))),
+                          .withOpacity(0.1))),
             ),
             child: SafeArea(
               child: Row(
@@ -745,7 +745,7 @@ class _DetectedItemCard extends StatelessWidget {
             Container(
               width: 48, height: 48,
               decoration: BoxDecoration(
-                  color: indicatorColor.withValues(alpha: 0.1),
+                  color: indicatorColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12)),
               child: Icon(indicatorIcon, color: indicatorColor, size: 24),
             ),
@@ -767,7 +767,7 @@ class _DetectedItemCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppTheme.infoBlue.withValues(alpha: 0.1),
+                            color: AppTheme.infoBlue.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text('Edited',
@@ -798,7 +798,7 @@ class _DetectedItemCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: indicatorColor.withValues(alpha: 0.1),
+                          color: indicatorColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -823,7 +823,7 @@ class _DetectedItemCard extends StatelessWidget {
                   icon: const Icon(Icons.edit),
                   iconSize: 20,
                   style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.infoBlue.withValues(alpha: 0.1),
+                    backgroundColor: AppTheme.infoBlue.withOpacity(0.1),
                     foregroundColor: AppTheme.infoBlue,
                   ),
                 ),
@@ -833,7 +833,7 @@ class _DetectedItemCard extends StatelessWidget {
                   icon: const Icon(Icons.close),
                   iconSize: 20,
                   style: IconButton.styleFrom(
-                    backgroundColor: AppTheme.errorRed.withValues(alpha: 0.1),
+                    backgroundColor: AppTheme.errorRed.withOpacity(0.1),
                     foregroundColor: AppTheme.errorRed,
                   ),
                 ),

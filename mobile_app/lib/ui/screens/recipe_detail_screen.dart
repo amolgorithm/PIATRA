@@ -41,14 +41,14 @@ class RecipeDetailScreen extends StatelessWidget {
   Widget _buildHeader(BuildContext context) {
     return Container(
       height: 200,
-      color: AppTheme.primaryGreen.withValues(alpha: 0.1),
+      color: AppTheme.primaryGreen.withOpacity(0.1),
       child: Stack(
         children: [
           Center(
             child: Icon(
               Icons.restaurant,
               size: 80,
-              color: AppTheme.primaryGreen.withValues(alpha: 0.3),
+              color: AppTheme.primaryGreen.withOpacity(0.3),
             ),
           ),
           Positioned(
