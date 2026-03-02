@@ -3,14 +3,18 @@ import 'package:provider/provider.dart';
 import 'routes/app_routes.dart';
 import 'core/constants/theme/app_theme.dart';
 import 'state/theme_provider.dart';
+import 'state/user_provider.dart';
 
 class App extends StatelessWidget {
   const App({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+      ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
           return MaterialApp(

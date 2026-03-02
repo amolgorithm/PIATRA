@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../routes/app_routes.dart';
 import '../../core/constants/theme/app_theme.dart';
 import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
+import '../../state/user_provider.dart';
+import '../../models/user_profile_model.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -80,15 +83,64 @@ class HomeScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
+                            GestureDetector(
+                              onTap: () => Navigator.pushNamed(context, AppRoutes.profile),
+                              child: Consumer<UserProvider>(
+                                builder: (context, userProvider, _) {
+                                  final mode = userProvider.profile?.cookingMode;
+                                  return Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: isDark ? AppTheme.cardDark : Colors.white,
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: isDark ? Colors.white12 : Colors.black.withValues(alpha: 0.07),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      mode?.emoji ?? '👤',
+                                      style: const TextStyle(fontSize: 20),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 32),
-                        Text(
-                          'What would you\nlike to do today?',
-                          style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            height: 1.2,
-                          ),
+                        Consumer<UserProvider>(
+                          builder: (context, userProvider, _) {
+                            final name = userProvider.profile?.displayName;
+                            final mode = userProvider.profile?.cookingMode;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  name != null ? 'Hello, $name 👋' : 'What would you\nlike to do today?',
+                                  style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.2,
+                                  ),
+                                ),
+                                if (mode != null) ...[
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: mode.gradientColors.map((c) => Color(c)).toList(),
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      '${mode.emoji} ${mode.label} Mode',
+                                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
