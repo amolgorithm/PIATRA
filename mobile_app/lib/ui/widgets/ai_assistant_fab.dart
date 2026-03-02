@@ -226,13 +226,17 @@ class _AIAssistantFABState extends State<AIAssistantFAB> with SingleTickerProvid
                 ),
               ),
               const SizedBox(width: 8),
+              // AFTER (working):
               Container(
                 decoration: BoxDecoration(
                   gradient: AppTheme.primaryGradient,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: IconButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    // Navigate to full assistant screen for proper chat
+                    Navigator.pushNamed(context, '/assistant');
+                  },
                   icon: const Icon(Icons.send_rounded),
                   color: Colors.white,
                 ),

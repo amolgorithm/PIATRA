@@ -43,7 +43,7 @@ async def register_user(user: UserCreate):
     """Register a new user - Note: Registration should typically happen client-side with Firebase Auth"""
     try:
         # Check if user already exists
-        existing_user = await user_repository.get_user_by_email(user.email)
+        existing_user = user_repository.get_user_by_email(user.email)
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -53,7 +53,7 @@ async def register_user(user: UserCreate):
         # Note: In production, user creation should happen client-side with Firebase Auth SDK
         # This endpoint is for creating the user profile in Firestore after Firebase Auth registration
         # For now, we'll create both for testing purposes
-        new_user = await user_repository.create_user(user)
+        new_user = user_repository.create_user(user)
         return new_user
 
     except Exception as e:
@@ -77,7 +77,7 @@ async def create_user_profile(
             avatar_url=user_data.avatar_url
         )
 
-        updated_user = await user_repository.update_user(current_user.uid, update_data)
+        updated_user = user_repository.update_user(current_user.uid, update_data)
         if not updated_user:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -95,10 +95,11 @@ async def create_user_profile(
         )
 
 @router.post("/login", response_model=Token)
-async def login_user(id_token: str):
+async def login_user(id_token: dict):
     """Login user with Firebase ID token and return access token"""
     try:
-        user = await user_repository.verify_firebase_token(id_token)
+        token_value = id_token.get('id_token') if isinstance(id_token, dict) else id_token
+        user = user_repository.verify_firebase_token(token_value)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -134,7 +135,7 @@ async def update_user_profile(
     """Update current user's profile"""
     try:
         # Update user
-        updated_user = await user_repository.update_user(current_user.uid, user_update)
+        updated_user = user_repository.update_user(current_user.uid, user_update)
         if not updated_user:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -156,7 +157,7 @@ async def delete_user_profile(current_user: UserProfile = Depends(get_current_us
     """Delete current user's profile"""
     try:
         # Delete user
-        success = await user_repository.delete_user(current_user.uid)
+        success = user_repository.delete_user(current_user.uid)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

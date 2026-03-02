@@ -1,11 +1,12 @@
 import google.generativeai as genai
 from app.core.config import Config
+from app.utils.text_processing import format_gemini_response
 
 genai.configure(api_key=Config.GEMINI_API_KEY)
 
 class AIAssistant:
     def __init__(self):
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel('gemini-2.5-flash')
 
     def generate_response(self, user_input: str, context: str = "") -> str:
         """
@@ -26,7 +27,7 @@ class AIAssistant:
 
         try:
             response = self.model.generate_content(prompt)
-            return response.text.strip()
+            return format_gemini_response(response.text.strip())
         except Exception as e:
             return f"Sorry, I encountered an error: {str(e)}"
 

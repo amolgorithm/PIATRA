@@ -9,7 +9,7 @@ class UserRepository:
         self.auth = firebase_client.get_auth_client()
         self.collection = self.db.collection('users')
 
-    async def create_user(self, user: UserCreate) -> UserProfile:
+    def create_user(self, user: UserCreate) -> UserProfile:
         """Create a new user in Firebase Auth and Firestore"""
         try:
             # Create user in Firebase Auth
@@ -24,9 +24,9 @@ class UserRepository:
                 'uid': user_record.uid,
                 'email': user.email,
                 'display_name': user.display_name,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'avatar_url': user.avatar_url,
+                'first_name': user.first_name or '',
+                'last_name': user.last_name or '',
+                'avatar_url': user.avatar_url or '',
                 'created_at': datetime.utcnow(),
                 'updated_at': datetime.utcnow(),
                 'is_active': True,
@@ -42,7 +42,7 @@ class UserRepository:
         except Exception as e:
             raise Exception(f"Failed to create user: {str(e)}")
 
-    async def get_user_by_uid(self, uid: str) -> Optional[UserProfile]:
+    def get_user_by_uid(self, uid: str) -> Optional[UserProfile]:
         """Get user by Firebase UID"""
         try:
             doc = self.collection.document(uid).get()
@@ -53,7 +53,7 @@ class UserRepository:
         except Exception as e:
             raise Exception(f"Failed to get user: {str(e)}")
 
-    async def get_user_by_email(self, email: str) -> Optional[UserProfile]:
+    def get_user_by_email(self, email: str) -> Optional[UserProfile]:
         """Get user by email"""
         try:
             docs = self.collection.where('email', '==', email).limit(1).get()
@@ -64,7 +64,36 @@ class UserRepository:
         except Exception as e:
             raise Exception(f"Failed to get user by email: {str(e)}")
 
-    async def update_user(self, uid: str, user_update: UserUpdate) -> Optional[UserProfile]:
+    def create_or_update_user_from_firebase(self, uid: str, email: str, display_name: str = '') -> UserProfile:
+        """Create or update user profile when they authenticate with Firebase"""
+        try:
+            existing_user = self.get_user_by_uid(uid)
+            if existing_user:
+                return existing_user
+
+            # Create new user document if it doesn't exist
+            user_data = {
+                'uid': uid,
+                'email': email,
+                'display_name': display_name or email.split('@')[0],
+                'first_name': '',
+                'last_name': '',
+                'avatar_url': '',
+                'created_at': datetime.utcnow(),
+                'updated_at': datetime.utcnow(),
+                'is_active': True,
+                'dietary_preferences': [],
+                'allergies': [],
+                'favorite_cuisines': []
+            }
+
+            self.collection.document(uid).set(user_data)
+            return UserProfile(**user_data)
+
+        except Exception as e:
+            raise Exception(f"Failed to create or update user: {str(e)}")
+
+    def update_user(self, uid: str, user_update: UserUpdate) -> Optional[UserProfile]:
         """Update user profile"""
         try:
             update_data = user_update.dict(exclude_unset=True)
@@ -73,12 +102,12 @@ class UserRepository:
             self.collection.document(uid).update(update_data)
 
             # Return updated user
-            return await self.get_user_by_uid(uid)
+            return self.get_user_by_uid(uid)
 
         except Exception as e:
             raise Exception(f"Failed to update user: {str(e)}")
 
-    async def delete_user(self, uid: str) -> bool:
+    def delete_user(self, uid: str) -> bool:
         """Delete user from Firestore and Firebase Auth"""
         try:
             # Delete from Firestore
@@ -92,32 +121,17 @@ class UserRepository:
         except Exception as e:
             raise Exception(f"Failed to delete user: {str(e)}")
 
-    async def authenticate_user(self, email: str, password: str) -> Optional[UserProfile]:
-        """Authenticate user with email and password using Firebase Auth"""
-        try:
-            # Note: In a production app, password verification should be done client-side
-            # with Firebase Auth SDK. Server-side password verification is not recommended.
-            # This method assumes the password has already been verified client-side.
-
-            # For now, just check if user exists in Firebase Auth
-            user = self.auth.get_user_by_email(email)
-
-            # Get user profile from Firestore
-            user_profile = await self.get_user_by_uid(user.uid)
-            return user_profile
-
-        except Exception as e:
-            return None
-
-    async def verify_firebase_token(self, id_token: str) -> Optional[UserProfile]:
+    def verify_firebase_token(self, id_token: str) -> Optional[UserProfile]:
         """Verify Firebase ID token and return user profile"""
         try:
             # Verify the Firebase ID token
             decoded_token = self.auth.verify_id_token(id_token)
             uid = decoded_token['uid']
+            email = decoded_token.get('email', '')
+            display_name = decoded_token.get('name', '')
 
-            # Get user profile from Firestore
-            user_profile = await self.get_user_by_uid(uid)
+            # Create or get user profile from Firestore
+            user_profile = self.create_or_update_user_from_firebase(uid, email, display_name)
             return user_profile
 
         except Exception as e:
