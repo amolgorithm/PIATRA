@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 import '../../core/constants/theme/app_theme.dart';
+import '../../state/user_provider.dart';
 
 class AssistantScreen extends StatefulWidget {
   const AssistantScreen({super.key});
@@ -22,7 +24,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
   void initState() {
     super.initState();
     _messages.add(ChatMessage(
-      text: "Hi! I'm PIATRA, your AI cooking assistant 🍳\n\nAsk me anything about recipes, ingredient substitutions, nutrition, or cooking techniques!",
+      text: "Hi! I'm PIATRA, your AI cooking assistant. Ask me anything about recipes, ingredient substitutions, nutrition, or cooking techniques!",
       isUser: false,
       timestamp: DateTime.now(),
     ));
@@ -74,15 +76,23 @@ class _AssistantScreenState extends State<AssistantScreen> {
         ? _messages.sublist(_messages.length - 10)
         : List<ChatMessage>.from(_messages);
 
-    final context = recentHistory
+    final conversationContext = recentHistory
         .map((m) => '${m.isUser ? "User" : "Assistant"}: ${m.text}')
         .join('\n');
+
+    // Get user ID from profile (using email as unique identifier)
+    final userProvider = context.read<UserProvider>();
+    final userId = userProvider.profile?.email ?? '';
 
     try {
       final response = await http.post(
         Uri.parse(_backendUrl),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'message': userMessage, 'context': context}),
+        body: jsonEncode({
+          'message': userMessage,
+          'context': conversationContext,
+          'user_id': userId,  // Include user_id for contextual awareness
+        }),
       ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
