@@ -15,9 +15,7 @@ class UserProvider extends ChangeNotifier {
   }
 
   void updateCookingMode(CookingMode mode) {
-    if (_profile == null) {
-      _profile = UserProfileModel.defaultProfile();
-    }
+    _profile ??= UserProfileModel.defaultProfile();
     _profile = _profile!.copyWith(cookingMode: mode);
     notifyListeners();
   }

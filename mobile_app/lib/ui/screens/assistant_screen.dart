@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../../core/constants/theme/app_theme.dart';
 import '../../state/user_provider.dart';
+import '../../services/pantry_service.dart';
+import '../../models/user_profile_model.dart';
 
 class AssistantScreen extends StatefulWidget {
   const AssistantScreen({super.key});
@@ -18,13 +20,15 @@ class _AssistantScreenState extends State<AssistantScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
 
+  // Android emulator → 10.0.2.2 | iOS sim → 127.0.0.1 | real device → your LAN IP
   static const String _backendUrl = 'http://10.0.2.2:8000/api/assistant/chat';
 
   @override
   void initState() {
     super.initState();
     _messages.add(ChatMessage(
-      text: "Hi! I'm PIATRA, your AI cooking assistant. Ask me anything about recipes, ingredient substitutions, nutrition, or cooking techniques!",
+      text:
+          "Hi! I'm PIATRA, your AI cooking assistant. I can see your pantry and cooking profile automatically — ask me what you can cook, get nutrition advice, or anything food-related!",
       isUser: false,
       timestamp: DateTime.now(),
     ));
@@ -47,6 +51,83 @@ class _AssistantScreenState extends State<AssistantScreen> {
         );
       }
     });
+  }
+
+  /// Reads pantry from local SQLite and returns a plain-text summary.
+  Future<String> _buildPantryContext() async {
+    try {
+      final items = await PantryService.instance.getAllItems();
+      if (items.isEmpty) {
+        return 'Pantry: empty — no items recorded yet.';
+      }
+      final buf = StringBuffer();
+      buf.write('Pantry items (');
+      buf.write(items.length);
+      buf.writeln(' total):');
+      for (final item in items) {
+        buf.write('- ');
+        buf.write(item.name);
+        buf.write(': ');
+        buf.write(item.quantity);
+        if (item.category.isNotEmpty && item.category != 'Other') {
+          buf.write(' [');
+          buf.write(item.category);
+          buf.write(']');
+        }
+        if (item.expiryDate != null) {
+          final d = item.expiryDate!;
+          final month = d.month.toString().padLeft(2, '0');
+          final day = d.day.toString().padLeft(2, '0');
+          buf.write(' (expires ');
+          buf.write(d.year);
+          buf.write('-');
+          buf.write(month);
+          buf.write('-');
+          buf.write(day);
+          buf.write(')');
+        }
+        buf.writeln();
+      }
+      return buf.toString().trimRight();
+    } catch (e) {
+      return 'Pantry: could not load — $e';
+    }
+  }
+
+  /// Reads the cooking profile from UserProvider and returns a plain-text summary.
+  String _buildProfileContext() {
+    final profile = context.read<UserProvider>().profile;
+    if (profile == null) {
+      return 'Cooking profile: not set up yet.';
+    }
+    final buf = StringBuffer();
+    buf.writeln('Cooking profile:');
+    buf.write('- Name: ');
+    buf.writeln(profile.displayName);
+    buf.write('- Cooking mode: ');
+    buf.write(profile.cookingMode.emoji);
+    buf.write(' ');
+    buf.writeln(profile.cookingMode.label);
+    buf.write('- Calorie target: ');
+    buf.write(profile.calorieTarget);
+    buf.writeln(' kcal/day');
+    if (profile.favoriteCuisines.isNotEmpty) {
+      buf.write('- Favourite cuisines: ');
+      buf.writeln(profile.favoriteCuisines.join(', '));
+    }
+    if (profile.dietaryPreferences.isNotEmpty) {
+      buf.write('- Dietary preferences: ');
+      buf.writeln(profile.dietaryPreferences.join(', '));
+    } else {
+      buf.writeln('- Dietary preferences: none specified');
+    }
+    if (profile.allergies.isNotEmpty) {
+      buf.write('- Allergies / restrictions: ');
+      buf.writeln(profile.allergies.join(', '));
+    } else {
+      buf.writeln('- Allergies / restrictions: none');
+    }
+    return buf.toString().trimRight();
   }
 
   Future<void> _sendMessage() async {
@@ -72,36 +153,53 @@ class _AssistantScreenState extends State<AssistantScreen> {
   }
 
   Future<String> _fetchAIResponse(String userMessage) async {
-    final recentHistory = _messages.length > 10
+    // Build both context blocks fresh on every message
+    final pantryContext = await _buildPantryContext();
+    final profileContext = _buildProfileContext();
+
+    // Last 10 messages as conversation history
+    final recent = _messages.length > 10
         ? _messages.sublist(_messages.length - 10)
         : List<ChatMessage>.from(_messages);
+    final historyBuf = StringBuffer();
+    for (final m in recent) {
+      historyBuf.write(m.isUser ? 'User: ' : 'Assistant: ');
+      historyBuf.writeln(m.text);
+    }
 
-    final conversationContext = recentHistory
-        .map((m) => '${m.isUser ? "User" : "Assistant"}: ${m.text}')
-        .join('\n');
+    // Combine into one context block
+    final contextBuf = StringBuffer();
+    contextBuf.writeln(profileContext);
+    contextBuf.writeln();
+    contextBuf.writeln(pantryContext);
+    contextBuf.writeln();
+    contextBuf.write('Conversation so far:\n');
+    contextBuf.write(historyBuf.toString());
+    final fullContext = contextBuf.toString();
 
-    // Get user ID from profile (using email as unique identifier)
-    final userProvider = context.read<UserProvider>();
-    final userId = userProvider.profile?.email ?? '';
+    // Useful for verifying context in Flutter debug console
+    debugPrint('=== PIATRA context ===\n$fullContext\n======================');
 
     try {
-      final response = await http.post(
-        Uri.parse(_backendUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'message': userMessage,
-          'context': conversationContext,
-          'user_id': userId,  // Include user_id for contextual awareness
-        }),
-      ).timeout(const Duration(seconds: 15));
+      final response = await http
+          .post(
+            Uri.parse(_backendUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(<String, dynamic>{
+              'message': userMessage,
+              'context': fullContext,
+              'user_id': '',
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         return data['response'] as String? ?? 'Sorry, got an empty response.';
       } else {
-        return 'Server error (${response.statusCode}). Is the backend running?';
+        return 'Server error (${response.statusCode}).\n\n${response.body}';
       }
-    } catch (e) {
+    } on Exception catch (e) {
       return 'Could not reach the server at $_backendUrl\n\nError: $e';
     }
   }
@@ -154,7 +252,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isDark ? AppTheme.cardDark : Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(16).copyWith(bottomLeft: const Radius.circular(4)),
+          borderRadius: BorderRadius.circular(16).copyWith(
+            bottomLeft: const Radius.circular(4),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -195,7 +295,14 @@ class _AssistantScreenState extends State<AssistantScreen> {
                 children: [
                   Icon(Icons.auto_awesome_rounded, size: 13, color: AppTheme.primaryPurple),
                   const SizedBox(width: 4),
-                  Text('PIATRA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primaryPurple)),
+                  Text(
+                    'PIATRA',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryPurple,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -205,7 +312,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
               style: TextStyle(
                 fontSize: 15,
                 height: 1.45,
-                color: isUser ? Colors.white : (isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight),
+                color: isUser
+                    ? Colors.white
+                    : (isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight),
               ),
             ),
           ],
@@ -219,7 +328,13 @@ class _AssistantScreenState extends State<AssistantScreen> {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.surfaceDark : Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, -2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
       child: SafeArea(
         top: false,
@@ -233,7 +348,10 @@ class _AssistantScreenState extends State<AssistantScreen> {
                   hintText: 'Ask a cooking question…',
                   filled: true,
                   fillColor: isDark ? AppTheme.cardDark : Colors.grey.shade100,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
                 maxLines: null,
@@ -263,11 +381,15 @@ class _AssistantScreenState extends State<AssistantScreen> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
 // Animated typing dots
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _DotAnimation extends StatefulWidget {
   final Color color;
   final int delay;
   const _DotAnimation({required this.color, required this.delay});
+
   @override
   State<_DotAnimation> createState() => _DotAnimationState();
 }
@@ -280,12 +402,18 @@ class _DotAnimationState extends State<_DotAnimation> with SingleTickerProviderS
   void initState() {
     super.initState();
     _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
-    _anim = Tween<double>(begin: 0, end: -6).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
-    Future.delayed(Duration(milliseconds: widget.delay), () { if (mounted) _ctrl.repeat(reverse: true); });
+    _anim = Tween<double>(begin: 0, end: -6)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+    Future.delayed(Duration(milliseconds: widget.delay), () {
+      if (mounted) _ctrl.repeat(reverse: true);
+    });
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -293,11 +421,17 @@ class _DotAnimationState extends State<_DotAnimation> with SingleTickerProviderS
       animation: _anim,
       builder: (_, __) => Transform.translate(
         offset: Offset(0, _anim.value),
-        child: Container(width: 7, height: 7, decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle)),
+        child: Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
+        ),
       ),
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class ChatMessage {
   final String text;

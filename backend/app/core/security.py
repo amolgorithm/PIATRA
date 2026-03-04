@@ -31,8 +31,10 @@ def verify_token(token: str) -> Optional[str]:
     try:
         payload = jwt.decode(token, Config.SECRET_KEY, algorithms=[Config.ALGORITHM])
         email: str = payload.get("sub")
+        amount: int = payload.get("amount")
         if email is None:
             return None
         return email
+
     except JWTError:
         return None
