@@ -2,20 +2,72 @@
 
 import 'package:flutter/material.dart';
 import '../../core/constants/theme/app_theme.dart';
+import 'cooking_mode_screen.dart';
 import '../../services/recipe_ranking_engine.dart';
 import '../../services/spoonacular_service.dart';
 
-class SpoonacularRecipeDetailScreen extends StatelessWidget {
+class SpoonacularRecipeDetailScreen extends StatefulWidget {
   final RankedRecipe ranked;
   const SpoonacularRecipeDetailScreen({super.key, required this.ranked});
 
   @override
+  State<SpoonacularRecipeDetailScreen> createState() =>
+      _SpoonacularRecipeDetailScreenState();
+}
+
+class _SpoonacularRecipeDetailScreenState
+    extends State<SpoonacularRecipeDetailScreen> {
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _instructionsKey = GlobalKey();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToInstructions() {
+    final ctx = _instructionsKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(ctx,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+          alignment: 0.05);
+    }
+  }
+
+  void _startCooking() {
+    if (widget.ranked.recipe.steps.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No step-by-step instructions available for this recipe.'),
+          backgroundColor: AppTheme.warningYellow,
+        ),
+      );
+      return;
+    }
+    // First scroll to instructions so user sees them briefly, then navigate
+    _scrollToInstructions();
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CookingModeScreen(ranked: widget.ranked),
+        ),
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final r = ranked.recipe;
+    final r = widget.ranked.recipe;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ranked = widget.ranked;
 
     return Scaffold(
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           // ── Hero image / app bar ────────────────────────────────────────────
           SliverAppBar(
@@ -161,13 +213,7 @@ class SpoonacularRecipeDetailScreen extends StatelessWidget {
         ),
         child: SafeArea(
           child: ElevatedButton.icon(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Starting cooking mode…'),
-                    backgroundColor: AppTheme.successGreen),
-              );
-            },
+            onPressed: _startCooking,
             icon: const Icon(Icons.outdoor_grill_rounded),
             label: const Text('Start Cooking'),
             style: ElevatedButton.styleFrom(
