@@ -38,6 +38,9 @@ dependencies:
   tflite_flutter: ^0.11.0
   google_mlkit_image_labeling: ^0.13.0
   
+  # Environment variables
+  flutter_dotenv: ^5.1.0
+
   # Utils
   intl: ^0.18.1
   

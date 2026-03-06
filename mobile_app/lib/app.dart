@@ -1,9 +1,11 @@
+// lib/app.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'routes/app_routes.dart';
 import 'core/constants/theme/app_theme.dart';
 import 'state/theme_provider.dart';
 import 'state/user_provider.dart';
+import 'state/recipe_provider.dart';
 
 class App extends StatelessWidget {
   const App({super.key});
@@ -14,6 +16,7 @@ class App extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => RecipeProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
