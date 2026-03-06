@@ -37,7 +37,7 @@ class SpoonacularIngredient {
 
   factory SpoonacularIngredient.fromJson(Map<String, dynamic> j) =>
       SpoonacularIngredient(
-        id: j['id'] as int,
+        id: (j['id'] as num).toInt(),
         name: j['name'] as String? ?? '',
         originalName: j['originalName'] as String? ?? j['name'] as String? ?? '',
         amount: (j['amount'] as num?)?.toDouble() ?? 0,
@@ -140,7 +140,7 @@ class SpoonacularStep {
 
   factory SpoonacularStep.fromJson(Map<String, dynamic> j) =>
       SpoonacularStep(
-        number: j['number'] as int,
+        number: (j['number'] as num).toInt(),
         step: j['step'] as String,
         ingredients: (j['ingredients'] as List<dynamic>?)
                 ?.map((i) => (i as Map)['name'].toString())
@@ -227,11 +227,11 @@ class SpoonacularRecipe {
     }
 
     return SpoonacularRecipe(
-      id: j['id'] as int,
+      id: (j['id'] as num).toInt(),
       title: j['title'] as String,
       image: j['image'] as String?,
-      readyInMinutes: j['readyInMinutes'] as int? ?? 30,
-      servings: j['servings'] as int? ?? 2,
+      readyInMinutes: (j['readyInMinutes'] as num?)?.toInt() ?? 30,
+      servings: (j['servings'] as num?)?.toInt() ?? 2,
       sourceUrl: j['sourceUrl'] as String?,
       summary: j['summary'] as String?,
       cuisines: List<String>.from(j['cuisines'] as List? ?? []),
@@ -245,7 +245,7 @@ class SpoonacularRecipe {
       veryHealthy: j['veryHealthy'] as bool? ?? false,
       cheap: j['cheap'] as bool? ?? false,
       veryPopular: j['veryPopular'] as bool? ?? false,
-      healthScore: j['healthScore'] as int?,
+      healthScore: (j['healthScore'] as num?)?.toInt(),
       spoonacularScore: (j['spoonacularScore'] as num?)?.toDouble(),
       ingredients: (j['extendedIngredients'] as List<dynamic>?)
               ?.map((i) => SpoonacularIngredient.fromJson(
@@ -285,11 +285,11 @@ class SpoonacularSearchResult {
 
   factory SpoonacularSearchResult.fromJson(Map<String, dynamic> j) =>
       SpoonacularSearchResult(
-        id: j['id'] as int,
+        id: (j['id'] as num).toInt(),
         title: j['title'] as String,
         image: j['image'] as String?,
-        usedIngredientCount: j['usedIngredientCount'] as int? ?? 0,
-        missedIngredientCount: j['missedIngredientCount'] as int? ?? 0,
+        usedIngredientCount: (j['usedIngredientCount'] as num?)?.toInt() ?? 0,
+        missedIngredientCount: (j['missedIngredientCount'] as num?)?.toInt() ?? 0,
         usedIngredients: (j['usedIngredients'] as List<dynamic>?)
                 ?.map((i) => (i as Map)['name'].toString())
                 .toList() ??
@@ -317,6 +317,8 @@ class SpoonacularService {
   // findByIngredients costs 1 point per recipe returned.
   static String get _apiKey => EnvConfig.spoonacularApiKey;
 
+  static bool get _hasKey => _apiKey.isNotEmpty;
+
   // ------------------------------------------------------------------
   // Search by pantry ingredients
   // ------------------------------------------------------------------
@@ -331,7 +333,7 @@ class SpoonacularService {
     int ranking = 1,
     bool ignorePantry = false,
   }) async {
-    if (ingredients.isEmpty) return [];
+    if (ingredients.isEmpty || !_hasKey) return [];
 
     final ingredientStr = ingredients.take(20).join(',+');
     final uri = Uri.parse(
@@ -385,6 +387,8 @@ class SpoonacularService {
     int number = 20,
     int offset = 0,
   }) async {
+    if (!_hasKey) return [];
+
     final params = <String, String>{
       'apiKey': _apiKey,
       'number': number.toString(),
@@ -438,6 +442,8 @@ class SpoonacularService {
   // ------------------------------------------------------------------
 
   Future<SpoonacularRecipe?> getRecipeInformation(int recipeId) async {
+    if (!_hasKey) return null;
+
     final uri = Uri.parse(
       '$_baseUrl/recipes/$recipeId/information'
       '?apiKey=$_apiKey&includeNutrition=true',
@@ -461,7 +467,7 @@ class SpoonacularService {
 
   /// Bulk fetch up to 100 recipes in one API call.
   Future<List<SpoonacularRecipe>> getRecipesBulk(List<int> ids) async {
-    if (ids.isEmpty) return [];
+    if (ids.isEmpty || !_hasKey) return [];
     final idStr = ids.take(100).join(',');
     final uri = Uri.parse(
       '$_baseUrl/recipes/informationBulk'

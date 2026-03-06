@@ -7,8 +7,43 @@ import 'state/theme_provider.dart';
 import 'state/user_provider.dart';
 import 'state/recipe_provider.dart';
 
-class App extends StatelessWidget {
+class App extends StatefulWidget {
   const App({super.key});
+
+  @override
+  State<App> createState() => _AppState();
+}
+
+class _AppState extends State<App> {
+  @override
+  void initState() {
+    super.initState();
+    // Load saved profile from Firebase as soon as the app starts
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<UserProvider>().loadFromFirebase();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          title: 'PIATRA',
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeProvider.themeMode,
+          initialRoute: AppRoutes.home,
+          onGenerateRoute: AppRoutes.onGenerateRoute,
+          debugShowCheckedModeBanner: false,
+        );
+      },
+    );
+  }
+}
+
+class _AppProviders extends StatelessWidget {
+  const _AppProviders();
 
   @override
   Widget build(BuildContext context) {
@@ -18,19 +53,15 @@ class App extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => RecipeProvider()),
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, child) {
-          return MaterialApp(
-            title: 'PIATRA',
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeProvider.themeMode,
-            initialRoute: AppRoutes.home,
-            onGenerateRoute: AppRoutes.onGenerateRoute,
-            debugShowCheckedModeBanner: false,
-          );
-        },
-      ),
+      child: const App(),
     );
   }
+}
+
+/// Top-level widget — use this in main.dart instead of App() directly.
+class RootApp extends StatelessWidget {
+  const RootApp({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _AppProviders();
 }

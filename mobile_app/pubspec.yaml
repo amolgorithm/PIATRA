@@ -9,41 +9,41 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
+
   # UI
   cupertino_icons: ^1.0.2
   google_fonts: ^6.1.0
-  
+
   # State Management
   provider: ^6.0.5
-  
+
   # Local Storage
   sqflite: ^2.3.0
   path_provider: ^2.1.1
-  
+  shared_preferences: ^2.2.2   # ← NEW: stable local UID for guest profiles
+
   # Networking
   http: ^1.1.0
-  
+
   # Firebase
   firebase_core: ^3.0.0
   firebase_auth: ^5.0.0
   cloud_firestore: ^5.6.12
-  
-  # Image Processing - CAMERA REMOVED, ONLY IMAGE_PICKER
+
+  # Image Processing
   image_picker: ^1.2.0
   image: ^4.1.0
-  # camera: ^0.10.5+5  # ← REMOVED - causing issues
-  
+
   # ML
   tflite_flutter: ^0.11.0
   google_mlkit_image_labeling: ^0.13.0
-  
+
   # Environment variables
   flutter_dotenv: ^5.1.0
 
   # Utils
   intl: ^0.18.1
-  
+
   # Web support
   web: ^1.1.1
 
@@ -54,3 +54,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - .env

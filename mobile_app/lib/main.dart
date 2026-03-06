@@ -7,7 +7,8 @@ import 'app.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await EnvConfig.load();  // Load .env before anything else
+  // Load .env before anything else
+  await EnvConfig.load();
 
   // Initialize Firebase
   try {
@@ -18,5 +19,5 @@ Future<void> main() async {
     debugPrint('   App will run in offline mode (SQLite only)');
   }
 
-  runApp(const App());
+  runApp(const RootApp());
 }

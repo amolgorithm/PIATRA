@@ -12,6 +12,7 @@ import '../../core/constants/theme/app_theme.dart';
 import '../../models/recipe_filter.dart';
 import '../../state/recipe_provider.dart';
 import '../../state/user_provider.dart';
+import '../../models/user_profile_model.dart';
 import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
 import 'spoonacular_recipe_detail_screen.dart';
@@ -32,8 +33,7 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
   }
 
   void _load() {
-    final profile = context.read<UserProvider>().profile;
-    if (profile == null) return;
+    final profile = context.read<UserProvider>().profile ?? UserProfileModel.defaultProfile();
     context.read<RecipeProvider>().loadRecommendations(profile: profile);
   }
 

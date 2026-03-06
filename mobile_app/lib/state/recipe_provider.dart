@@ -79,33 +79,44 @@ class RecipeProvider extends ChangeNotifier {
   // ── Private ────────────────────────────────────────────────────────────────
 
   Future<void> _fetch() async {
+    if (_profile == null) {
+      _loadState = RecipeLoadState.error;
+      _errorMessage = 'No user profile loaded.';
+      notifyListeners();
+      return;
+    }
+
     _loadState = RecipeLoadState.loading;
     _errorMessage = null;
     notifyListeners();
 
-    try {
-      final pantryNames = _pantry.map((i) => i.name).toList();
-      List<SpoonacularRecipe> recipes = [];
+    final pantryNames = _pantry.map((i) => i.name).toList();
+    final combined = <SpoonacularRecipe>[];
+    final seen = <int>{};
 
+    // ── Step 1: findByIngredients + bulk detail fetch ──────────────────────
+    try {
       if (pantryNames.isNotEmpty) {
-        // ── Step 1: Find recipes by pantry ingredients ──────────────────────
         final searchResults = await SpoonacularService.instance.findByIngredients(
           ingredients: pantryNames,
           number: 30,
-          ranking: 1, // maximise used ingredients
+          ranking: 1,
         );
-
         if (searchResults.isNotEmpty) {
-          // ── Step 2: Bulk-fetch full details (nutrition, steps, diets) ──────
           final ids = searchResults.map((r) => r.id).toList();
-          recipes = await SpoonacularService.instance.getRecipesBulk(ids);
+          final details = await SpoonacularService.instance.getRecipesBulk(ids);
+          for (final r in details) {
+            if (seen.add(r.id)) combined.add(r);
+          }
         }
       }
+    } catch (e) {
+      debugPrint('[RecipeProvider] findByIngredients error: $e');
+    }
 
-      // ── Step 3: Also do a complexSearch tailored to user profile ───────────
-      // This catches great recipes even when pantry data is sparse.
-      final profileRecipes =
-          await SpoonacularService.instance.complexSearch(
+    // ── Step 2: complexSearch tailored to profile ──────────────────────────
+    try {
+      final profileRecipes = await SpoonacularService.instance.complexSearch(
         cuisine: _filter.cuisines,
         diet: _filter.diets,
         intolerances: _filter.intolerances,
@@ -117,27 +128,26 @@ class RecipeProvider extends ChangeNotifier {
         maxCarbs: _filter.maxCarbsG,
         number: 20,
       );
-
-      // ── Step 4: Merge & deduplicate ────────────────────────────────────────
-      final seen = <int>{};
-      final combined = <SpoonacularRecipe>[];
-      for (final r in [...recipes, ...profileRecipes]) {
+      for (final r in profileRecipes) {
         if (seen.add(r.id)) combined.add(r);
       }
+    } catch (e) {
+      debugPrint('[RecipeProvider] complexSearch error: $e');
+    }
 
-      // ── Step 5: Rank ───────────────────────────────────────────────────────
+    // ── Step 3: Rank whatever we got ──────────────────────────────────────
+    try {
       _rankedRecipes = RecipeRankingEngine.instance.rankAndFilter(
         recipes: combined,
         profile: _profile!,
         pantry: _pantry,
         filter: _filter,
       );
-
       _loadState = RecipeLoadState.loaded;
     } catch (e) {
+      debugPrint('[RecipeProvider] ranking error: $e');
       _errorMessage = e.toString();
       _loadState = RecipeLoadState.error;
-      debugPrint('[RecipeProvider] error: $e');
     }
 
     notifyListeners();
