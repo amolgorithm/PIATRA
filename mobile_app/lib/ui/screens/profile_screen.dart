@@ -1,8 +1,79 @@
+// lib/ui/screens/profile_screen.dart
+//
+// Unified Profile & Preferences screen.
+// Sections:
+//   1. Identity        – display name + avatar initial
+//   2. Cooking Mode    – mode cards
+//   3. Calorie Target  – slider + live macro breakdown
+//   4. Diet            – chip grid (hard exclusions)
+//   5. Cuisines        – chip grid (ranking priority)
+//   6. Allergies       – chip grid (hard exclusions)
+//
+// All changes auto-save to Firestore via UserProvider on back-navigation
+// (WillPopScope) or by tapping the Save button that appears when dirty.
+// On save, RecipeProvider re-fetches with the updated profile.
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/constants/theme/app_theme.dart';
 import '../../models/user_profile_model.dart';
 import '../../state/user_provider.dart';
+import '../../state/recipe_provider.dart';
+
+// ─── Option data ──────────────────────────────────────────────────────────────
+
+class _Opt {
+  final String id;
+  final String label;
+  final String emoji;
+  final String? sub;
+  const _Opt(this.id, this.label, this.emoji, [this.sub]);
+}
+
+const _diets = [
+  _Opt('vegetarian',  'Vegetarian',  '🥬', 'No meat or fish'),
+  _Opt('vegan',       'Vegan',       '🌱', 'No animal products'),
+  _Opt('gluten free', 'Gluten-Free', '🌾', 'No gluten'),
+  _Opt('dairy free',  'Dairy-Free',  '🥛', 'No dairy'),
+  _Opt('ketogenic',   'Keto',        '🥑', 'Very low carb'),
+  _Opt('paleo',       'Paleo',       '🍖', 'No grains/legumes'),
+  _Opt('pescetarian', 'Pescetarian', '🐟', 'Fish, no other meat'),
+  _Opt('whole30',     'Whole30',     '🥦', 'Clean whole foods'),
+  _Opt('low fodmap',  'Low FODMAP',  '🫐', 'Gut-friendly'),
+];
+
+const _cuisines = [
+  _Opt('Italian',        'Italian',        '🍝'),
+  _Opt('Japanese',       'Japanese',       '🍣'),
+  _Opt('Mexican',        'Mexican',        '🌮'),
+  _Opt('Indian',         'Indian',         '🍛'),
+  _Opt('Chinese',        'Chinese',        '🥢'),
+  _Opt('Thai',           'Thai',           '🍜'),
+  _Opt('Mediterranean',  'Mediterranean',  '🫒'),
+  _Opt('American',       'American',       '🍔'),
+  _Opt('French',         'French',         '🥐'),
+  _Opt('Greek',          'Greek',          '🫙'),
+  _Opt('Spanish',        'Spanish',        '🥘'),
+  _Opt('Middle Eastern', 'Middle Eastern', '🧆'),
+  _Opt('Korean',         'Korean',         '🍱'),
+  _Opt('Vietnamese',     'Vietnamese',     '🍲'),
+];
+
+const _allergies = [
+  _Opt('dairy',     'Dairy',      '🥛'),
+  _Opt('egg',       'Eggs',       '🥚'),
+  _Opt('gluten',    'Gluten',     '🌾'),
+  _Opt('peanut',    'Peanuts',    '🥜'),
+  _Opt('tree nut',  'Tree Nuts',  '🌰'),
+  _Opt('soy',       'Soy',        '🫘'),
+  _Opt('seafood',   'Seafood',    '🦐'),
+  _Opt('shellfish', 'Shellfish',  '🦞'),
+  _Opt('sesame',    'Sesame',     '🌿'),
+  _Opt('wheat',     'Wheat',      '🍞'),
+];
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -12,187 +83,287 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  late CookingMode _selectedMode;
-  late List<String> _selectedDietaryPrefs;
+  // ── Draft state ────────────────────────────────────────────────────────────
+  late TextEditingController _nameCtrl;
+  late CookingMode _mode;
+  late int _calories;
+  late List<String> _selectedDiets;
+  late List<String> _selectedCuisines;
   late List<String> _selectedAllergies;
-  bool _saved = false;
 
-  static const _allDietaryOptions = [
-    'Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free',
-    'Keto', 'Paleo', 'High-Protein', 'Low-Carb',
-    'Budget-Friendly', 'Quick (<30 min)', 'Meal Prep',
-  ];
-
-  static const _allAllergyOptions = [
-    'Nuts', 'Peanuts', 'Gluten', 'Dairy', 'Eggs',
-    'Soy', 'Shellfish', 'Fish', 'Wheat', 'Sesame',
-  ];
+  bool _dirty = false;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    final profile = context.read<UserProvider>().profile;
-    _selectedMode = profile?.cookingMode ?? CookingMode.general;
-    _selectedDietaryPrefs = List.from(profile?.dietaryPreferences ?? []);
-    _selectedAllergies = List.from(profile?.allergies ?? []);
+    final p = context.read<UserProvider>().profile ?? UserProfileModel.defaultProfile();
+    _nameCtrl  = TextEditingController(text: p.displayName);
+    _mode      = p.cookingMode;
+    _calories  = p.calorieTarget;
+    _selectedDiets     = List.from(p.dietaryPreferences);
+    _selectedCuisines  = List.from(p.favoriteCuisines);
+    _selectedAllergies = List.from(p.allergies);
   }
 
-  void _selectMode(CookingMode mode) {
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── Persistence ────────────────────────────────────────────────────────────
+
+  Future<void> _save() async {
+    if (!_dirty) return;
+    final name = _nameCtrl.text.trim();
+    setState(() => _saving = true);
+
+    final up = context.read<UserProvider>();
+    if (name.isNotEmpty) await up.updateDisplayName(name);
+    await up.updateCookingMode(_mode);
+    await up.updateCalorieTarget(_calories);
+    await up.updateDietaryPreferences(_selectedDiets);
+    await up.updateFavoriteCuisines(_selectedCuisines);
+    await up.updateAllergies(_selectedAllergies);
+
+    final profile = up.profile;
+    if (profile != null && mounted) {
+      context.read<RecipeProvider>().loadRecommendations(profile: profile);
+    }
+
+    if (mounted) setState(() { _saving = false; _dirty = false; });
+  }
+
+  void _mark() => setState(() => _dirty = true);
+
+  // ── Toggle helpers ─────────────────────────────────────────────────────────
+
+  bool _hasDiet(String id)    => _selectedDiets.any((d) => d.toLowerCase() == id);
+  bool _hasCuisine(String id) => _selectedCuisines.any((c) => c.toLowerCase() == id.toLowerCase());
+  bool _hasAllergy(String id) => _selectedAllergies.any((a) => a.toLowerCase() == id);
+
+  void _toggleDiet(String id) {
     setState(() {
-      _selectedMode = mode;
-      // Auto-apply the mode's default dietary preferences
-      // but preserve any existing user choices
-      final defaults = mode.defaultDietaryPreferences
-          .map((e) => _toDisplayLabel(e))
-          .toList();
-      for (final d in defaults) {
-        if (!_selectedDietaryPrefs.contains(d)) {
-          _selectedDietaryPrefs.add(d);
-        }
+      if (_hasDiet(id)) {
+        _selectedDiets.removeWhere((d) => d.toLowerCase() == id);
+        // Removing vegan doesn't remove vegetarian automatically
+      } else {
+        if (id == 'vegan' && !_hasDiet('vegetarian')) _selectedDiets.add('vegetarian');
+        _selectedDiets.add(id);
       }
     });
+    _mark();
   }
 
-  String _toDisplayLabel(String raw) {
-    // Convert backend tags like 'high-protein' to display 'High-Protein'
-    return raw.split('-').map((w) => w.isEmpty ? '' : w[0].toUpperCase() + w.substring(1)).join('-');
-  }
-
-  void _saveProfile() {
-    final provider = context.read<UserProvider>();
-    final current = provider.profile ?? UserProfileModel.defaultProfile();
-    provider.setProfile(current.copyWith(
-      cookingMode: _selectedMode,
-      dietaryPreferences: _selectedDietaryPrefs,
-      allergies: _selectedAllergies,
-      calorieTarget: _selectedMode.defaultCalorieTarget,
-    ));
-    setState(() => _saved = true);
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (mounted) Navigator.pop(context);
+  void _toggleCuisine(String id) {
+    setState(() {
+      if (_hasCuisine(id)) {
+        _selectedCuisines.removeWhere((c) => c.toLowerCase() == id.toLowerCase());
+      } else {
+        _selectedCuisines.add(id);
+      }
     });
+    _mark();
   }
+
+  void _toggleAllergy(String id) {
+    setState(() {
+      if (_hasAllergy(id)) {
+        _selectedAllergies.removeWhere((a) => a.toLowerCase() == id);
+      } else {
+        _selectedAllergies.add(id);
+      }
+    });
+    _mark();
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppTheme.backgroundDark : const Color(0xFFF7F6FB);
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Background
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark
-                    ? [AppTheme.backgroundDark, AppTheme.surfaceDark]
-                    : [AppTheme.backgroundLight, Colors.white],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+    return WillPopScope(
+      onWillPop: () async { await _save(); return true; },
+      child: Scaffold(
+        backgroundColor: bg,
+        body: CustomScrollView(
+          slivers: [
+            _appBar(isDark),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 48),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  _identityCard(isDark),
+                  _divider(),
+                  _sectionHeader('Cooking Mode',
+                      'Shapes what kind of recipes we surface', null, isDark),
+                  _modeGrid(isDark),
+                  _divider(),
+                  _sectionHeader('Daily Calorie Target',
+                      'Matches recipes to your per-meal energy goal', null, isDark),
+                  _calorieSlider(isDark),
+                  _divider(),
+                  _sectionHeader(
+                    'Dietary Preferences',
+                    'Hard exclusions — non-compliant recipes are never shown',
+                    _selectedDiets.isNotEmpty ? '${_selectedDiets.length} active' : null,
+                    isDark,
+                    badgeColor: AppTheme.successGreen,
+                  ),
+                  _chipGrid(_selectedDiets, _diets, isDark, AppTheme.successGreen, _toggleDiet),
+                  _divider(),
+                  _sectionHeader(
+                    'Favourite Cuisines',
+                    'Matching recipes are always ranked first',
+                    _selectedCuisines.isNotEmpty ? '${_selectedCuisines.length} selected' : null,
+                    isDark,
+                  ),
+                  _chipGrid(_selectedCuisines, _cuisines, isDark, AppTheme.primaryPurple, _toggleCuisine),
+                  _divider(),
+                  _sectionHeader(
+                    'Allergies & Intolerances',
+                    'Hard exclusions — these ingredients are never shown',
+                    _selectedAllergies.isNotEmpty ? '${_selectedAllergies.length} active' : null,
+                    isDark,
+                    badgeColor: AppTheme.accentOrange,
+                  ),
+                  _chipGrid(_selectedAllergies, _allergies, isDark, AppTheme.accentOrange, _toggleAllergy),
+                  const SizedBox(height: 32),
+                  _saveButton(),
+                ]),
               ),
             ),
-          ),
-
-          SafeArea(
-            child: Column(
-              children: [
-                _buildAppBar(isDark),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionTitle('Choose Your Cooking Mode', isDark),
-                        const SizedBox(height: 12),
-                        _buildModeGrid(isDark),
-                        const SizedBox(height: 28),
-                        _buildSelectedModeDetails(isDark),
-                        const SizedBox(height: 28),
-                        _buildSectionTitle('Dietary Preferences', isDark),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Select all that apply',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildChipSelector(
-                          options: _allDietaryOptions,
-                          selected: _selectedDietaryPrefs,
-                          color: AppTheme.primaryPurple,
-                          onToggle: (val) => setState(() {
-                            _selectedDietaryPrefs.contains(val)
-                                ? _selectedDietaryPrefs.remove(val)
-                                : _selectedDietaryPrefs.add(val);
-                          }),
-                        ),
-                        const SizedBox(height: 28),
-                        _buildSectionTitle('Allergies & Restrictions', isDark),
-                        const SizedBox(height: 4),
-                        Text(
-                          'We\'ll flag recipes containing these',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildChipSelector(
-                          options: _allAllergyOptions,
-                          selected: _selectedAllergies,
-                          color: AppTheme.errorRed,
-                          onToggle: (val) => setState(() {
-                            _selectedAllergies.contains(val)
-                                ? _selectedAllergies.remove(val)
-                                : _selectedAllergies.add(val);
-                          }),
-                        ),
-                        const SizedBox(height: 28),
-                        _buildCalorieCard(isDark),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Save button pinned at bottom
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _buildSaveBar(isDark),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildAppBar(bool isDark) {
+  // ── App bar ────────────────────────────────────────────────────────────────
+
+  Widget _appBar(bool isDark) {
+    return SliverAppBar(
+      pinned: true,
+      expandedHeight: 100,
+      backgroundColor: isDark ? AppTheme.backgroundDark : const Color(0xFFF7F6FB),
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_rounded),
+        onPressed: () async { await _save(); if (mounted) Navigator.pop(context); },
+      ),
+      actions: [
+        if (_saving)
+          const Padding(
+            padding: EdgeInsets.only(right: 20),
+            child: Center(
+              child: SizedBox(
+                width: 18, height: 18,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(AppTheme.primaryPurple)),
+              ),
+            ),
+          )
+        else if (_dirty)
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: TextButton(
+              onPressed: _save,
+              child: const Text('Save',
+                  style: TextStyle(
+                      color: AppTheme.primaryPurple,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15)),
+            ),
+          ),
+      ],
+      flexibleSpace: FlexibleSpaceBar(
+        titlePadding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Profile',
+                style: TextStyle(
+                    fontSize: 26, fontWeight: FontWeight.w800,
+                    letterSpacing: -0.6)),
+            Text('Identity & preferences',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                    color: isDark
+                        ? AppTheme.textSecondaryDark
+                        : AppTheme.textSecondaryLight)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Identity card ──────────────────────────────────────────────────────────
+
+  Widget _identityCard(bool isDark) {
+    final initial = (_nameCtrl.text.isNotEmpty ? _nameCtrl.text[0] : '?')
+        .toUpperCase();
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(vertical: 20),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back_rounded),
-            style: IconButton.styleFrom(
-              backgroundColor: isDark ? AppTheme.cardDark : Colors.white,
+          // Avatar
+          Container(
+            width: 64,
+            height: 64,
+            decoration: const BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(initial,
+                  style: const TextStyle(
+                      fontSize: 28, fontWeight: FontWeight.bold,
+                      color: Colors.white)),
             ),
           ),
           const SizedBox(width: 16),
+          // Name field
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('My Profile', style: Theme.of(context).textTheme.headlineMedium),
-                Text(
-                  'Personalize your cooking experience',
-                  style: Theme.of(context).textTheme.bodySmall,
+                Text('Display name',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? AppTheme.textSecondaryDark
+                            : AppTheme.textSecondaryLight,
+                        fontWeight: FontWeight.w500)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: _nameCtrl,
+                  onChanged: (_) { setState(() {}); _mark(); },
+                  style: const TextStyle(
+                      fontSize: 17, fontWeight: FontWeight.w700),
+                  decoration: InputDecoration(
+                    hintText: 'Your name',
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    filled: true,
+                    fillColor: isDark ? AppTheme.cardDark : Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                          color: AppTheme.primaryPurple, width: 1.5),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -202,410 +373,349 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title, bool isDark) {
-    return Text(
-      title,
-      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-    );
-  }
+  // ── Cooking mode grid ──────────────────────────────────────────────────────
 
-  Widget _buildModeGrid(bool isDark) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.15,
-      children: CookingMode.values.map((mode) => _ModeCard(
-        mode: mode,
-        isSelected: _selectedMode == mode,
-        onTap: () => _selectMode(mode),
-      )).toList(),
-    );
-  }
-
-  Widget _buildSelectedModeDetails(bool isDark) {
-    final mode = _selectedMode;
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 250),
-      child: Container(
-        key: ValueKey(mode),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: mode.gradientColors.map((c) => Color(c)).toList(),
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Color(mode.gradientColors.first).withOpacity(0.3),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(mode.icon, size: 32, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        mode.label,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        mode.tagline,
-                        style: const TextStyle(color: Colors.white70, fontSize: 13),
-                      ),
-                    ],
+  Widget _modeGrid(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        children: CookingMode.values.map((mode) {
+          final sel = _mode == mode;
+          final colors = mode.gradientColors.map((c) => Color(c)).toList();
+          return GestureDetector(
+            onTap: () { setState(() => _mode = mode); _mark(); },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: sel ? LinearGradient(colors: colors) : null,
+                color: sel ? null : (isDark ? AppTheme.cardDark : Colors.white),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: sel ? Colors.transparent
+                      : (isDark ? Colors.white12 : Colors.black12),
+                ),
+                boxShadow: sel
+                    ? [BoxShadow(
+                        color: colors.first.withOpacity(0.3),
+                        blurRadius: 12, offset: const Offset(0, 4))]
+                    : [],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      color: sel
+                          ? Colors.white.withOpacity(0.2)
+                          : colors.first.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Center(
+                        child: Text(mode.emoji,
+                            style: const TextStyle(fontSize: 19))),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(mode.label,
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 14,
+                                color: sel ? Colors.white : null)),
+                        const SizedBox(height: 1),
+                        Text(mode.tagline,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: sel
+                                    ? Colors.white.withOpacity(0.8)
+                                    : (isDark
+                                        ? AppTheme.textSecondaryDark
+                                        : AppTheme.textSecondaryLight))),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    sel ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: sel ? Colors.white
+                        : (isDark ? Colors.white24 : Colors.black26),
+                    size: 20,
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 14),
-            Text(
-              mode.description,
-              style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: mode.suggestedTags.map((tag) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(tag, style: const TextStyle(color: Colors.white, fontSize: 12)),
-              )).toList(),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.local_fire_department, color: Colors.white70, size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  'Daily target: ${mode.defaultCalorieTarget} kcal',
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ],
-        ),
+          );
+        }).toList(),
       ),
     );
   }
 
-  Widget _buildChipSelector({
-    required List<String> options,
-    required List<String> selected,
-    required Color color,
-    required void Function(String) onToggle,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: options.map((opt) {
-        final isSelected = selected.contains(opt);
-        return GestureDetector(
-          onTap: () => onToggle(opt),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: isSelected ? color.withOpacity(0.15) : (isDark ? AppTheme.cardDark : Colors.white),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isSelected ? color : (isDark ? Colors.white24 : Colors.black12),
-                width: isSelected ? 1.5 : 1,
+  // ── Calorie slider ─────────────────────────────────────────────────────────
+
+  Widget _calorieSlider(bool isDark) {
+    final macros = MacroTargets.fromCalories(_calories);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        children: [
+          // Big number display
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('$_calories',
+                  style: const TextStyle(
+                      fontSize: 48, fontWeight: FontWeight.w800,
+                      color: AppTheme.primaryPurple, letterSpacing: -2)),
+              const SizedBox(width: 6),
+              const Padding(
+                padding: EdgeInsets.only(top: 16),
+                child: Text('kcal / day',
+                    style: TextStyle(
+                        fontSize: 14, color: AppTheme.textSecondaryLight,
+                        fontWeight: FontWeight.w500)),
               ),
+            ],
+          ),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              activeTrackColor: AppTheme.primaryPurple,
+              inactiveTrackColor: AppTheme.primaryPurple.withOpacity(0.15),
+              thumbColor: AppTheme.primaryPurple,
+              overlayColor: AppTheme.primaryPurple.withOpacity(0.1),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+              trackHeight: 5,
+            ),
+            child: Slider(
+              value: _calories.toDouble(),
+              min: 1200, max: 4000, divisions: 56,
+              onChanged: (v) { setState(() => _calories = v.round()); _mark(); },
+            ),
+          ),
+          // Range labels
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: ['1,200', '1,800', '2,500', '3,200', '4,000']
+                  .map((l) => Text(l,
+                      style: const TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.textSecondaryLight)))
+                  .toList(),
+            ),
+          ),
+          const SizedBox(height: 14),
+          // Macro breakdown
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppTheme.cardDark
+                  : AppTheme.primaryPurple.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: AppTheme.primaryPurple.withOpacity(0.12)),
             ),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                if (isSelected) ...[
-                  Icon(Icons.check_rounded, size: 14, color: color),
-                  const SizedBox(width: 4),
-                ],
-                Text(
-                  opt,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    color: isSelected
-                        ? color
-                        : (isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight),
-                  ),
-                ),
+                _macroTile('Protein', '${macros.proteinG.round()}g',
+                    Colors.red.shade400),
+                _vline(isDark),
+                _macroTile('Carbs', '${macros.carbsG.round()}g',
+                    Colors.blue.shade400),
+                _vline(isDark),
+                _macroTile('Fat', '${macros.fatG.round()}g',
+                    Colors.orange.shade400),
               ],
             ),
           ),
-        );
-      }).toList(),
+        ],
+      ),
     );
   }
 
-  Widget _buildCalorieCard(bool isDark) {
-    final target = _selectedMode.defaultCalorieTarget;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark ? Colors.white12 : Colors.black.withOpacity(0.06),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _macroTile(String label, String value, Color color) => Column(
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppTheme.secondaryTeal.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.local_fire_department_rounded,
-                    color: AppTheme.secondaryTeal, size: 24),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Daily Calorie Target',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          )),
-                  Text('Based on your ${_selectedMode.label} profile',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight,
-                      )),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '$target kcal/day',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppTheme.secondaryTeal,
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppTheme.secondaryTeal.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _selectedMode.label,
-                  style: const TextStyle(
-                    color: AppTheme.secondaryTeal,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: target / 3500,
-              backgroundColor: Colors.grey.shade200,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.secondaryTeal),
-              minHeight: 8,
-            ),
-          ),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 17, fontWeight: FontWeight.bold, color: color)),
+          const SizedBox(height: 2),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 11, color: AppTheme.textSecondaryLight)),
         ],
-      ),
-    );
-  }
+      );
 
-  Widget _buildSaveBar(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.surfaceDark : Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: _saved
-              ? Container(
-                  key: const ValueKey('saved'),
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppTheme.successGreen,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+  Widget _vline(bool isDark) => Container(
+        width: 1, height: 28,
+        color: isDark ? Colors.white12 : Colors.black12);
+
+  // ── Chip grid ──────────────────────────────────────────────────────────────
+
+  // Works for diets, cuisines, and allergies by accepting the relevant _Opt list.
+  Widget _chipGrid(
+    List<String> activeList,
+    List<_Opt> optionList,
+    bool isDark,
+    Color activeColor,
+    void Function(String) onToggle,
+  ) {
+    final opts = optionList;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Wrap(
+        spacing: 9,
+        runSpacing: 9,
+        children: opts.map((opt) {
+          final on = activeColor == AppTheme.primaryPurple
+              ? _hasCuisine(opt.id)
+              : activeColor == AppTheme.successGreen
+                  ? _hasDiet(opt.id)
+                  : _hasAllergy(opt.id);
+          return GestureDetector(
+            onTap: () => onToggle(opt.id),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+              decoration: BoxDecoration(
+                color: on
+                    ? activeColor.withOpacity(0.12)
+                    : (isDark ? AppTheme.cardDark : Colors.white),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: on
+                      ? activeColor.withOpacity(0.55)
+                      : (isDark ? Colors.white12 : Colors.black12),
+                  width: on ? 1.5 : 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(opt.emoji, style: const TextStyle(fontSize: 15)),
+                  const SizedBox(width: 7),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.check_circle_rounded, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text('Profile Saved!',
+                      Text(opt.label,
                           style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold)),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: on ? activeColor : null)),
+                      if (opt.sub != null)
+                        Text(opt.sub!,
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: on
+                                    ? activeColor.withOpacity(0.7)
+                                    : AppTheme.textSecondaryLight)),
                     ],
                   ),
-                )
-              : GestureDetector(
-                  key: const ValueKey('save'),
-                  onTap: _saveProfile,
-                  child: Container(
-                    height: 56,
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primaryPurple.withOpacity(0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.save_rounded, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text('Save Profile',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                ),
+                  if (on) ...[
+                    const SizedBox(width: 5),
+                    Icon(Icons.check_rounded, size: 13, color: activeColor),
+                  ],
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ── Save button ────────────────────────────────────────────────────────────
+
+  Widget _saveButton() {
+    return AnimatedOpacity(
+      opacity: _dirty ? 1.0 : 0.35,
+      duration: const Duration(milliseconds: 200),
+      child: SizedBox(
+        width: double.infinity,
+        height: 54,
+        child: ElevatedButton.icon(
+          onPressed: _dirty && !_saving ? _save : null,
+          icon: _saving
+              ? const SizedBox(
+                  width: 18, height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2.5, color: Colors.white))
+              : const Icon(Icons.check_circle_rounded),
+          label: Text(_saving ? 'Saving…' : 'Save Changes',
+              style: const TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.bold)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryPurple,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: AppTheme.primaryPurple,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16)),
+          ),
         ),
       ),
     );
   }
-}
 
-// ── Mode selection card ───────────────────────────────────────────────────────
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
-class _ModeCard extends StatelessWidget {
-  final CookingMode mode;
-  final bool isSelected;
-  final VoidCallback onTap;
+  Widget _divider() => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Divider(height: 1),
+      );
 
-  const _ModeCard({
-    required this.mode,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = mode.gradientColors.map((c) => Color(c)).toList();
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight)
-              : null,
-          color: isSelected ? null : (isDark ? AppTheme.cardDark : Colors.white),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? Colors.transparent : (isDark ? Colors.white12 : Colors.black.withOpacity(0.08)),
-            width: 1.5,
-          ),
-          boxShadow: isSelected
-              ? [BoxShadow(color: colors.first.withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 6))]
-              : [],
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Icon(mode.icon, size: 28, color: Colors.white),
-                if (isSelected)
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.25),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.check_rounded, color: Colors.white, size: 14),
-                  ),
-              ],
-            ),
-            Column(
+  Widget _sectionHeader(
+    String title,
+    String subtitle,
+    String? badge,
+    bool isDark, {
+    Color badgeColor = AppTheme.primaryPurple,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  mode.label,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isSelected
-                        ? Colors.white
-                        : (isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight),
-                  ),
-                ),
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3)),
                 const SizedBox(height: 2),
-                Text(
-                  mode.tagline,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isSelected
-                        ? Colors.white70
-                        : (isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(subtitle,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? AppTheme.textSecondaryDark
+                            : AppTheme.textSecondaryLight)),
               ],
             ),
+          ),
+          if (badge != null) ...[
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: badgeColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(badge,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: badgeColor,
+                      fontWeight: FontWeight.bold)),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

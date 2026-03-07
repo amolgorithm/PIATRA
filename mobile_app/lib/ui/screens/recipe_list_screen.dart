@@ -19,6 +19,7 @@ import 'spoonacular_recipe_detail_screen.dart';
 import '../../services/recipe_ranking_engine.dart';
 import '../../state/saved_recipes_provider.dart';
 import 'saved_recipes_screen.dart';
+import 'profile_screen.dart';
 
 class RecipeListScreen extends StatefulWidget {
   const RecipeListScreen({super.key});
@@ -128,6 +129,37 @@ class _AppBarSection extends StatelessWidget {
             style: IconButton.styleFrom(
               backgroundColor: isDark ? AppTheme.cardDark : Colors.white,
             ),
+          ),
+          const SizedBox(width: 4),
+          // Profile button — shows avatar initial from profile name
+          Consumer<UserProvider>(
+            builder: (ctx, up, _) {
+              final initial = (up.profile?.displayName.isNotEmpty == true
+                      ? up.profile!.displayName[0]
+                      : '?')
+                  .toUpperCase();
+              return GestureDetector(
+                onTap: () => Navigator.push(
+                  ctx,
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                ).then((_) => onRefresh()),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(initial,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15)),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(width: 4),
           // Sort button
