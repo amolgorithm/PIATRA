@@ -17,6 +17,8 @@ import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
 import 'spoonacular_recipe_detail_screen.dart';
 import '../../services/recipe_ranking_engine.dart';
+import '../../state/saved_recipes_provider.dart';
+import 'saved_recipes_screen.dart';
 
 class RecipeListScreen extends StatefulWidget {
   const RecipeListScreen({super.key});
@@ -115,6 +117,19 @@ class _AppBarSection extends StatelessWidget {
               ),
             ),
           ),
+          // Saved recipes button
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const SavedRecipesScreen()),
+            ),
+            icon: const Icon(Icons.bookmark_rounded),
+            style: IconButton.styleFrom(
+              backgroundColor: isDark ? AppTheme.cardDark : Colors.white,
+            ),
+          ),
+          const SizedBox(width: 4),
           // Sort button
           Consumer<RecipeProvider>(
             builder: (ctx, p, _) => IconButton(
@@ -284,15 +299,33 @@ class _RecipeListBody extends StatelessWidget {
           return const _EmptyState();
         }
 
+        // Build the full item list including optional banner + section header
+        final items = <Widget>[];
+
+        // Pantry match warning banner
+        if (p.pantryMatchWarning) {
+          items.add(const _PantryWarningBanner());
+        }
+
+        for (int i = 0; i < p.rankedRecipes.length; i++) {
+          // Fallback section divider
+          if (p.hasFallbackSection && i == p.fallbackStartIndex) {
+            items.add(const _SectionDivider(
+              label: 'Other great recipes',
+              subtitle: 'Outside your selected cuisine — ranked by best overall match',
+            ));
+          }
+          items.add(_RankedRecipeCard(
+            ranked: p.rankedRecipes[i],
+            rank: i + 1,
+          ));
+        }
+
         return RefreshIndicator(
           onRefresh: p.refresh,
-          child: ListView.builder(
+          child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-            itemCount: p.rankedRecipes.length,
-            itemBuilder: (ctx, i) {
-              final ranked = p.rankedRecipes[i];
-              return _RankedRecipeCard(ranked: ranked, rank: i + 1);
-            },
+            children: items,
           ),
         );
       },
@@ -345,7 +378,7 @@ class _RankedRecipeCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Image / header
-            _CardHeader(recipe: r, rank: rank, score: score, matchColor: matchColor),
+            _CardHeader(ranked: ranked, rank: rank, score: score, matchColor: matchColor),
 
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -405,18 +438,19 @@ class _RankedRecipeCard extends StatelessWidget {
 }
 
 class _CardHeader extends StatelessWidget {
-  final dynamic recipe;
+  final RankedRecipe ranked;
   final int rank;
   final double score;
   final Color matchColor;
   const _CardHeader(
-      {required this.recipe,
+      {required this.ranked,
       required this.rank,
       required this.score,
       required this.matchColor});
 
   @override
   Widget build(BuildContext context) {
+    final recipe = ranked.recipe;
     return Stack(
       children: [
         // Recipe image or placeholder gradient
@@ -429,9 +463,9 @@ class _CardHeader extends StatelessWidget {
                   height: 160,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _placeholderGradient(),
+                  errorBuilder: (_, __, ___) => _placeholderGradient(recipe),
                 )
-              : _placeholderGradient(),
+              : _placeholderGradient(recipe),
         ),
 
         // Rank badge
@@ -474,11 +508,39 @@ class _CardHeader extends StatelessWidget {
             ),
           ),
         ),
+
+        // Bookmark button
+        Positioned(
+          bottom: 10,
+          right: 10,
+          child: Consumer<SavedRecipesProvider>(
+            builder: (ctx, sp, _) {
+              final saved = sp.isSaved(recipe.id);
+              return GestureDetector(
+                onTap: () => sp.toggle(recipe),
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.55),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    saved
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    color: saved ? AppTheme.warningYellow : Colors.white,
+                    size: 18,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
       ],
     );
   }
 
-  Widget _placeholderGradient() {
+  Widget _placeholderGradient(dynamic recipe) {
     final colors = [
       [const Color(0xFF6C63FF), const Color(0xFF5B54E8)],
       [const Color(0xFF00D4AA), const Color(0xFF00B894)],
@@ -624,6 +686,91 @@ class _ReasonChip extends StatelessWidget {
               fontSize: 11,
               color: AppTheme.primaryPurple,
               fontWeight: FontWeight.w500)),
+    );
+  }
+}
+
+// ─── Pantry warning banner ────────────────────────────────────────────────────
+
+class _PantryWarningBanner extends StatelessWidget {
+  const _PantryWarningBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.warningYellow.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.warningYellow.withOpacity(0.4)),
+      ),
+      child: Row(
+        children: [
+          const Text('🧺', style: TextStyle(fontSize: 24)),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Limited pantry matches',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.warningYellow),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'None of these recipes closely match your current pantry — showing the best overall results for your preferences.',
+                  style: TextStyle(fontSize: 12, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Section divider ──────────────────────────────────────────────────────────
+
+class _SectionDivider extends StatelessWidget {
+  final String label;
+  final String subtitle;
+  const _SectionDivider({required this.label, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Divider(color: Colors.grey.withOpacity(0.3))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: AppTheme.primaryPurple),
+                ),
+              ),
+              Expanded(child: Divider(color: Colors.grey.withOpacity(0.3))),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: const TextStyle(
+                fontSize: 11, color: AppTheme.textSecondaryLight),
+          ),
+        ],
+      ),
     );
   }
 }

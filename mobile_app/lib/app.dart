@@ -6,6 +6,8 @@ import 'core/constants/theme/app_theme.dart';
 import 'state/theme_provider.dart';
 import 'state/user_provider.dart';
 import 'state/recipe_provider.dart';
+import 'state/saved_recipes_provider.dart';
+
 
 class App extends StatefulWidget {
   const App({super.key});
@@ -52,6 +54,9 @@ class _AppProviders extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => RecipeProvider()),
+        ChangeNotifierProvider(
+          create: (_) => SavedRecipesProvider()..init(),
+        ),
       ],
       child: const App(),
     );
