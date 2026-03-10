@@ -200,11 +200,18 @@ class HomeScreen extends StatelessWidget {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Coming soon!')),
-                          );
-                        },
+                        onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
+                      ),
+                      _FeatureCard(
+                        icon: Icons.feedback_rounded,
+                        title: 'Feedback',
+                        description: 'Send feedback',
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFB24BF3), Color(0xFF9D3FDD)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        onTap: () => Navigator.pushNamed(context, AppRoutes.feedback),
                       ),
                     ]),
                   ),

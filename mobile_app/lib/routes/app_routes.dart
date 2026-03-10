@@ -6,6 +6,7 @@ import '../ui/screens/recipe_list_screen.dart';
 import '../ui/screens/recipe_detail_screen.dart';
 import '../ui/screens/assistant_screen.dart';
 import '../ui/screens/profile_screen.dart';   // ADD THIS
+import '../ui/screens/feedback_form_screen.dart';
 import '../models/recipe.dart';
 
 class AppRoutes {
@@ -16,6 +17,7 @@ class AppRoutes {
   static const String recipeDetail = '/recipe-detail';
   static const String assistant  = '/assistant';
   static const String profile    = '/profile';   // ADD THIS
+  static const String feedback   = '/feedback';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -28,6 +30,7 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => RecipeDetailScreen(recipe: recipe));
       case assistant:    return MaterialPageRoute(builder: (_) => const AssistantScreen());
       case profile:      return MaterialPageRoute(builder: (_) => const ProfileScreen());  // ADD THIS
+      case feedback:     return MaterialPageRoute(builder: (_) => const FeedbackFormScreen());
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(
@@ -37,3 +40,4 @@ class AppRoutes {
     }
   }
 }
+
