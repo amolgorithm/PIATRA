@@ -28,6 +28,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
   @override
   void initState() {
     super.initState();
+    _warmUpBackend(); // wake Render before user types
     _messages.add(ChatMessage(
       text:
           "Hi! I'm PIATRA, your AI cooking assistant. I can see your pantry and cooking profile automatically — ask me what you can cook, get nutrition advice, or anything food-related!",
@@ -35,6 +36,13 @@ class _AssistantScreenState extends State<AssistantScreen> {
       timestamp: DateTime.now(),
     ));
   }
+
+  Future<void> _warmUpBackend() async {
+  try {
+    await http.get(Uri.parse(AppConfig.baseUrl + '/health'))
+        .timeout(const Duration(seconds: 60));
+  } catch (_) {} // silently ignore, just a best-effort warm-up
+}
 
   @override
   void dispose() {
