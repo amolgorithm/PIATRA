@@ -1,7 +1,18 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.api import assistant, nutrition, pantry, recipes, users
 
 app = FastAPI(title="PIATRA Backend API", version="1.0.0")
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# Allow Flutter web, mobile, and local dev to call the API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # Tighten this after launch (e.g. your domain only)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include routers
 app.include_router(assistant, prefix="/api/assistant", tags=["assistant"])
@@ -13,6 +24,11 @@ app.include_router(users, prefix="/api/users", tags=["users"])
 @app.get("/")
 async def root():
     return {"message": "Welcome to PIATRA Backend API"}
+
+@app.get("/health")
+async def health():
+    """Render uses this to confirm the service is alive."""
+    return {"status": "ok"}
 
 if __name__ == "__main__":
     import uvicorn

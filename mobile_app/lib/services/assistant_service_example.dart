@@ -1,9 +1,10 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../core/config/app_config.dart';
 
 /// Example service showing how to use the context-aware AI assistant
 class AssistantService {
-  static const String _backendUrl = 'http://10.0.2.2:8000/api/assistant';
+  static String get _backendUrl => AppConfig.assistantBaseUrl;
 
   /// Send a chat message with user context for personalized responses
   static Future<String> sendChatMessage({

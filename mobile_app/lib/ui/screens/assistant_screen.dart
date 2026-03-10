@@ -6,6 +6,8 @@ import '../../core/constants/theme/app_theme.dart';
 import '../../state/user_provider.dart';
 import '../../services/pantry_service.dart';
 import '../../models/user_profile_model.dart';
+import '../../core/config/app_config.dart';
+
 
 class AssistantScreen extends StatefulWidget {
   const AssistantScreen({super.key});
@@ -20,8 +22,8 @@ class _AssistantScreenState extends State<AssistantScreen> {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
 
-  // Android emulator → 10.0.2.2 | iOS sim → 127.0.0.1 | real device → your LAN IP
-  static const String _backendUrl = 'http://10.0.2.2:8000/api/assistant/chat';
+  
+  static String get _backendUrl => AppConfig.assistantChatUrl;
 
   @override
   void initState() {

@@ -16,6 +16,7 @@ import '../../core/constants/theme/app_theme.dart';
 import '../../services/spoonacular_service.dart';
 import '../../services/recipe_ranking_engine.dart';
 import '../../state/user_provider.dart';
+import '../../core/config/app_config.dart';
 
 class CookingModeScreen extends StatefulWidget {
   final RankedRecipe ranked;
@@ -47,7 +48,7 @@ class _CookingModeScreenState extends State<CookingModeScreen>
   // Step scroll
   final ScrollController _stepScrollController = ScrollController();
 
-  static const String _backendUrl = 'http://10.0.2.2:8000/api/assistant/chat';
+  static String get _backendUrl => AppConfig.assistantChatUrl;
 
   List<SpoonacularStep> get _steps => widget.ranked.recipe.steps;
   SpoonacularStep get _step => _steps[_currentStep];
