@@ -8,37 +8,59 @@ class AIAssistantFAB extends StatefulWidget {
   State<AIAssistantFAB> createState() => _AIAssistantFABState();
 }
 
-class _AIAssistantFABState extends State<AIAssistantFAB> with SingleTickerProviderStateMixin {
+class _AIAssistantFABState extends State<AIAssistantFAB>
+    with TickerProviderStateMixin {
   bool _isExpanded = false;
-  late AnimationController _animationController;
-  late Animation<double> _expandAnimation;
+
+  late AnimationController _expandCtrl;
+  late AnimationController _fabCtrl;
+  late AnimationController _pulseCtrl;
+
+  late Animation<double> _expandAnim;
+  late Animation<double> _fabScaleAnim;
+  late Animation<double> _pulseAnim;
+  late Animation<Offset> _panelSlide;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
+
+    _expandCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 350),
     );
-    _expandAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
+    _fabCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 200),
+      lowerBound: 0.9, upperBound: 1.0, value: 1.0,
     );
+    _pulseCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+
+    _expandAnim = CurvedAnimation(parent: _expandCtrl, curve: Curves.easeOutCubic);
+    _fabScaleAnim = _fabCtrl;
+    _pulseAnim = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
+    _panelSlide = Tween<Offset>(
+      begin: const Offset(0, 0.12), end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _expandCtrl, curve: Curves.easeOutCubic));
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _expandCtrl.dispose();
+    _fabCtrl.dispose();
+    _pulseCtrl.dispose();
     super.dispose();
   }
 
-  void _toggleExpanded() {
+  void _toggle() {
     setState(() {
       _isExpanded = !_isExpanded;
       if (_isExpanded) {
-        _animationController.forward();
+        _expandCtrl.forward();
+        _pulseCtrl.stop();
       } else {
-        _animationController.reverse();
+        _expandCtrl.reverse();
+        _pulseCtrl.repeat(reverse: true);
       }
     });
   }
@@ -46,57 +68,39 @@ class _AIAssistantFABState extends State<AIAssistantFAB> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Stack(
       alignment: Alignment.bottomRight,
       children: [
-        // Backdrop when expanded
+        // Backdrop
         if (_isExpanded)
           GestureDetector(
-            onTap: _toggleExpanded,
-            child: Container(
-              color: Colors.black.withOpacity(0.5),
-            ),
+            onTap: _toggle,
+            child: Container(color: Colors.black.withOpacity(0.45)),
           ),
-        
-        // Chat panel
+
+        // Floating panel
         Positioned(
-          bottom: 80,
+          bottom: 82,
           right: 16,
           child: AnimatedBuilder(
-            animation: _expandAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _expandAnimation.value,
-                alignment: Alignment.bottomRight,
-                child: Opacity(
-                  opacity: _expandAnimation.value,
-                  child: Container(
-                    width: MediaQuery.of(context).size.width - 32,
-                    height: 400,
-                    decoration: BoxDecoration(
-                      color: isDark ? AppTheme.surfaceDark : AppTheme.surfaceLight,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: _buildChatPanel(isDark),
-                  ),
-                ),
-              );
-            },
+            animation: _expandAnim,
+            builder: (_, child) => Transform.scale(
+              scale: _expandAnim.value,
+              alignment: Alignment.bottomRight,
+              child: Opacity(
+                opacity: _expandAnim.value,
+                child: SlideTransition(position: _panelSlide, child: child),
+              ),
+            ),
+            child: _buildPanel(isDark),
           ),
         ),
-        
+
         // FAB
         Positioned(
-          bottom: 16,
-          right: 16,
+          bottom: 20,
+          right: 20,
           child: _buildFAB(isDark),
         ),
       ],
@@ -105,155 +109,225 @@ class _AIAssistantFABState extends State<AIAssistantFAB> with SingleTickerProvid
 
   Widget _buildFAB(bool isDark) {
     return GestureDetector(
-      onTap: _toggleExpanded,
-      child: Container(
-        width: 64,
-        height: 64,
-        decoration: BoxDecoration(
-          gradient: AppTheme.primaryGradient,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.primaryPurple.withOpacity(0.4),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+      onTapDown: (_) => _fabCtrl.reverse(),
+      onTapUp: (_) { _fabCtrl.forward(); _toggle(); },
+      onTapCancel: () => _fabCtrl.forward(),
+      child: AnimatedBuilder(
+        animation: _fabScaleAnim,
+        builder: (_, child) => Transform.scale(scale: _fabScaleAnim.value, child: child),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Pulse ring (only when closed)
+            if (!_isExpanded)
+              AnimatedBuilder(
+                animation: _pulseAnim,
+                builder: (_, __) => Container(
+                  width: 72 + _pulseAnim.value * 10,
+                  height: 72 + _pulseAnim.value * 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.primaryPurple
+                        .withOpacity(0.15 * (1 - _pulseAnim.value)),
+                  ),
+                ),
+              ),
+            Container(
+              width: 62,
+              height: 62,
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryPurple.withOpacity(0.5),
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                transitionBuilder: (child, anim) => RotationTransition(
+                  turns: Tween<double>(begin: 0.25, end: 1.0).animate(anim),
+                  child: FadeTransition(opacity: anim, child: child),
+                ),
+                child: Icon(
+                  _isExpanded ? Icons.close_rounded : Icons.auto_awesome_rounded,
+                  key: ValueKey(_isExpanded),
+                  color: Colors.white,
+                  size: 26,
+                ),
+              ),
             ),
           ],
-        ),
-        child: Icon(
-          _isExpanded ? Icons.close_rounded : Icons.auto_awesome_rounded,
-          color: Colors.white,
-          size: 28,
         ),
       ),
     );
   }
 
-  Widget _buildChatPanel(bool isDark) {
-    return Column(
-      children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: AppTheme.primaryGradient,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(24),
-              topRight: Radius.circular(24),
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'AI Assistant',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      'Always here to help',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+  Widget _buildPanel(bool isDark) {
+    final width = MediaQuery.of(context).size.width - 32;
+
+    return Container(
+      width: width,
+      height: 400,
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: isDark ? const Color(0x20FFFFFF) : const Color(0x10000000),
         ),
-        
-        // Chat messages
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _buildAssistantMessage(
-                'Hi! I\'m your cooking companion. I\'ll help you throughout your journey. What would you like to cook today?',
-                isDark,
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryPurple.withOpacity(isDark ? 0.3 : 0.12),
+            blurRadius: 30,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: Column(
+          children: [
+            // Panel header
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+              decoration: const BoxDecoration(
+                gradient: AppTheme.primaryGradient,
               ),
-            ],
-          ),
-        ),
-        
-        // Input area
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.cardDark : Colors.grey.shade50,
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(24),
-              bottomRight: Radius.circular(24),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.auto_awesome_rounded,
+                        color: Colors.white, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('PIATRA',
+                            style: TextStyle(
+                              color: Colors.white, fontSize: 16,
+                              fontWeight: FontWeight.w700, letterSpacing: 0.5,
+                            )),
+                        Text('Your AI cooking companion',
+                            style: TextStyle(color: Colors.white70, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Ask me anything...',
-                    filled: true,
-                    fillColor: isDark ? AppTheme.surfaceDark : Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
+
+            // Messages area
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _AssistantBubble(
+                    text: 'Hi! Ask me anything about cooking, nutrition, or what you can make with your pantry.',
+                    isDark: isDark,
+                  ),
+                ],
+              ),
+            ),
+
+            // Input row
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.cardDarkElevated : const Color(0xFFF7F6FF),
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? const Color(0x15FFFFFF) : const Color(0x10000000),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              // AFTER (working):
-              Container(
-                decoration: BoxDecoration(
-                  gradient: AppTheme.primaryGradient,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: IconButton(
-                  onPressed: () {
-                    // Navigate to full assistant screen for proper chat
-                    Navigator.pushNamed(context, '/assistant');
-                  },
-                  icon: const Icon(Icons.send_rounded),
-                  color: Colors.white,
-                ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.cardDark : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isDark
+                              ? const Color(0x18FFFFFF)
+                              : const Color(0x10000000),
+                        ),
+                      ),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Ask anything…',
+                          border: InputBorder.none,
+                          filled: false,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          hintStyle: TextStyle(
+                            fontSize: 13,
+                            color: isDark
+                                ? AppTheme.textSecondaryDark
+                                : AppTheme.textSecondaryLight,
+                          ),
+                        ),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      _toggle();
+                      Navigator.pushNamed(context, '/assistant');
+                    },
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        gradient: AppTheme.primaryGradient,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryPurple.withOpacity(0.4),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.arrow_forward_rounded,
+                          color: Colors.white, size: 18),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
+}
 
-  Widget _buildAssistantMessage(String text, bool isDark) {
+class _AssistantBubble extends StatelessWidget {
+  final String text;
+  final bool isDark;
+  const _AssistantBubble({required this.text, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.surfaceDark : Colors.grey.shade100,
+        color: isDark
+            ? AppTheme.cardDarkElevated
+            : const Color(0xFFF4F3FF),
         borderRadius: BorderRadius.circular(16).copyWith(
           topLeft: const Radius.circular(4),
         ),
@@ -261,7 +335,8 @@ class _AIAssistantFABState extends State<AIAssistantFAB> with SingleTickerProvid
       child: Text(
         text,
         style: TextStyle(
-          fontSize: 14,
+          fontSize: 13,
+          height: 1.55,
           color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
         ),
       ),

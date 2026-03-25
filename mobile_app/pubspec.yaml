@@ -12,7 +12,7 @@ dependencies:
 
   # UI
   cupertino_icons: ^1.0.2
-  google_fonts: ^6.1.0
+  google_fonts: ^6.2.1
 
   # State Management
   provider: ^6.0.5

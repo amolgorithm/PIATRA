@@ -8,7 +8,6 @@ import '../../services/pantry_service.dart';
 import '../../models/user_profile_model.dart';
 import '../../core/config/app_config.dart';
 
-
 class AssistantScreen extends StatefulWidget {
   const AssistantScreen({super.key});
 
@@ -16,38 +15,56 @@ class AssistantScreen extends StatefulWidget {
   State<AssistantScreen> createState() => _AssistantScreenState();
 }
 
-class _AssistantScreenState extends State<AssistantScreen> {
+class _AssistantScreenState extends State<AssistantScreen>
+    with TickerProviderStateMixin {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
 
-  
+  late AnimationController _inputCtrl;
+  late Animation<double> _inputScale;
+
   static String get _backendUrl => AppConfig.assistantChatUrl;
+
+  static const List<String> _suggestions = [
+    '🍳 What can I cook tonight?',
+    '🥗 Healthy meal ideas',
+    '⏱ Quick 20-min recipes',
+    '🛒 What am I missing?',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _warmUpBackend(); // wake Render before user types
+
+    _inputCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 200),
+      lowerBound: 0.97, upperBound: 1.0, value: 1.0,
+    );
+    _inputScale = _inputCtrl;
+
+    _warmUpBackend();
     _messages.add(ChatMessage(
-      text:
-          "Hi! I'm PIATRA, your AI cooking assistant. I can see your pantry and cooking profile automatically — ask me what you can cook, get nutrition advice, or anything food-related!",
+      text: "Hi! I'm PIATRA, your AI cooking assistant. I can see your pantry and cooking profile automatically — ask me what you can cook, get nutrition advice, or anything food-related!",
       isUser: false,
       timestamp: DateTime.now(),
     ));
   }
 
   Future<void> _warmUpBackend() async {
-  try {
-    await http.get(Uri.parse(AppConfig.baseUrl + '/health'))
-        .timeout(const Duration(seconds: 60));
-  } catch (_) {} // silently ignore, just a best-effort warm-up
-}
+    try {
+      await http
+          .get(Uri.parse('${AppConfig.baseUrl}/health'))
+          .timeout(const Duration(seconds: 60));
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _inputCtrl.dispose();
     super.dispose();
   }
 
@@ -56,45 +73,26 @@ class _AssistantScreenState extends State<AssistantScreen> {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 350),
           curve: Curves.easeOut,
         );
       }
     });
   }
 
-  /// Reads pantry from local SQLite and returns a plain-text summary.
   Future<String> _buildPantryContext() async {
     try {
       final items = await PantryService.instance.getAllItems();
-      if (items.isEmpty) {
-        return 'Pantry: empty — no items recorded yet.';
-      }
-      final buf = StringBuffer();
-      buf.write('Pantry items (');
-      buf.write(items.length);
-      buf.writeln(' total):');
+      if (items.isEmpty) return 'Pantry: empty — no items recorded yet.';
+      final buf = StringBuffer('Pantry items (${items.length} total):\n');
       for (final item in items) {
-        buf.write('- ');
-        buf.write(item.name);
-        buf.write(': ');
-        buf.write(item.quantity);
+        buf.write('- ${item.name}: ${item.quantity}');
         if (item.category.isNotEmpty && item.category != 'Other') {
-          buf.write(' [');
-          buf.write(item.category);
-          buf.write(']');
+          buf.write(' [${item.category}]');
         }
         if (item.expiryDate != null) {
           final d = item.expiryDate!;
-          final month = d.month.toString().padLeft(2, '0');
-          final day = d.day.toString().padLeft(2, '0');
-          buf.write(' (expires ');
-          buf.write(d.year);
-          buf.write('-');
-          buf.write(month);
-          buf.write('-');
-          buf.write(day);
-          buf.write(')');
+          buf.write(' (expires ${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')})');
         }
         buf.writeln();
       }
@@ -104,44 +102,23 @@ class _AssistantScreenState extends State<AssistantScreen> {
     }
   }
 
-  /// Reads the cooking profile from UserProvider and returns a plain-text summary.
   String _buildProfileContext() {
     final profile = context.read<UserProvider>().profile;
-    if (profile == null) {
-      return 'Cooking profile: not set up yet.';
-    }
-    final buf = StringBuffer();
-    buf.writeln('Cooking profile:');
-    buf.write('- Name: ');
-    buf.writeln(profile.displayName);
-    buf.write('- Cooking mode: ');
-    buf.write(profile.cookingMode.emoji);
-    buf.write(' ');
-    buf.writeln(profile.cookingMode.label);
-    buf.write('- Calorie target: ');
-    buf.write(profile.calorieTarget);
-    buf.writeln(' kcal/day');
+    if (profile == null) return 'Cooking profile: not set up yet.';
+    final buf = StringBuffer('Cooking profile:\n');
+    buf.writeln('- Name: ${profile.displayName}');
+    buf.writeln('- Cooking mode: ${profile.cookingMode.emoji} ${profile.cookingMode.label}');
+    buf.writeln('- Calorie target: ${profile.calorieTarget} kcal/day');
     if (profile.favoriteCuisines.isNotEmpty) {
-      buf.write('- Favourite cuisines: ');
-      buf.writeln(profile.favoriteCuisines.join(', '));
+      buf.writeln('- Favourite cuisines: ${profile.favoriteCuisines.join(', ')}');
     }
-    if (profile.dietaryPreferences.isNotEmpty) {
-      buf.write('- Dietary preferences: ');
-      buf.writeln(profile.dietaryPreferences.join(', '));
-    } else {
-      buf.writeln('- Dietary preferences: none specified');
-    }
-    if (profile.allergies.isNotEmpty) {
-      buf.write('- Allergies / restrictions: ');
-      buf.writeln(profile.allergies.join(', '));
-    } else {
-      buf.writeln('- Allergies / restrictions: none');
-    }
+    buf.writeln('- Dietary preferences: ${profile.dietaryPreferences.isEmpty ? 'none' : profile.dietaryPreferences.join(', ')}');
+    buf.writeln('- Allergies: ${profile.allergies.isEmpty ? 'none' : profile.allergies.join(', ')}');
     return buf.toString().trimRight();
   }
 
-  Future<void> _sendMessage() async {
-    final text = _messageController.text.trim();
+  Future<void> _sendMessage([String? prefill]) async {
+    final text = (prefill ?? _messageController.text).trim();
     if (text.isEmpty || _isLoading) return;
 
     setState(() {
@@ -163,41 +140,25 @@ class _AssistantScreenState extends State<AssistantScreen> {
   }
 
   Future<String> _fetchAIResponse(String userMessage) async {
-    // Build both context blocks fresh on every message
-    final pantryContext = await _buildPantryContext();
-    final profileContext = _buildProfileContext();
-
-    // Last 10 messages as conversation history
+    final pantryCtx = await _buildPantryContext();
+    final profileCtx = _buildProfileContext();
     final recent = _messages.length > 10
         ? _messages.sublist(_messages.length - 10)
         : List<ChatMessage>.from(_messages);
-    final historyBuf = StringBuffer();
-    for (final m in recent) {
-      historyBuf.write(m.isUser ? 'User: ' : 'Assistant: ');
-      historyBuf.writeln(m.text);
-    }
+    final history = recent
+        .map((m) => '${m.isUser ? 'User' : 'Assistant'}: ${m.text}')
+        .join('\n');
 
-    // Combine into one context block
-    final contextBuf = StringBuffer();
-    contextBuf.writeln(profileContext);
-    contextBuf.writeln();
-    contextBuf.writeln(pantryContext);
-    contextBuf.writeln();
-    contextBuf.write('Conversation so far:\n');
-    contextBuf.write(historyBuf.toString());
-    final fullContext = contextBuf.toString();
-
-    // Useful for verifying context in Flutter debug console
-    debugPrint('=== PIATRA context ===\n$fullContext\n======================');
+    final ctx = '$profileCtx\n\n$pantryCtx\n\nConversation:\n$history';
 
     try {
       final response = await http
           .post(
             Uri.parse(_backendUrl),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(<String, dynamic>{
+            body: jsonEncode({
               'message': userMessage,
-              'context': fullContext,
+              'context': ctx,
               'user_id': '',
             }),
           )
@@ -206,11 +167,10 @@ class _AssistantScreenState extends State<AssistantScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         return data['response'] as String? ?? 'Sorry, got an empty response.';
-      } else {
-        return 'Server error (${response.statusCode}).\n\n${response.body}';
       }
+      return 'Server error (${response.statusCode}).';
     } on Exception catch (e) {
-      return 'Could not reach the server at $_backendUrl\n\nError: $e';
+      return 'Could not reach the server.\n\nError: $e';
     }
   }
 
@@ -219,37 +179,210 @@ class _AssistantScreenState extends State<AssistantScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 10),
-            const Text('Cooking Assistant'),
-          ],
-        ),
-      ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              itemCount: _messages.length + (_isLoading ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _messages.length) return _buildTypingIndicator(isDark);
-                return _buildMessageBubble(_messages[index], isDark);
-              },
+          // Ambient bg
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDark
+                    ? [AppTheme.backgroundDark, AppTheme.surfaceDark]
+                    : [AppTheme.backgroundLight, Colors.white],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
             ),
           ),
-          _buildInputArea(isDark),
+          Positioned(
+            top: -40, right: -60,
+            child: Container(
+              width: 200, height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(colors: [
+                  AppTheme.primaryPurple.withOpacity(isDark ? 0.15 : 0.07),
+                  Colors.transparent,
+                ]),
+              ),
+            ),
+          ),
+
+          SafeArea(
+            child: Column(
+              children: [
+                _buildAppBar(isDark),
+                Expanded(child: _buildMessageList(isDark)),
+                if (_messages.length <= 1) _buildSuggestions(isDark),
+                _buildInputArea(isDark),
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAppBar(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.cardDark : Colors.white,
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(
+                  color: isDark ? const Color(0x18FFFFFF) : const Color(0x10000000),
+                ),
+              ),
+              child: Icon(Icons.arrow_back_rounded,
+                  color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
+                  size: 20),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Container(
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+              borderRadius: BorderRadius.circular(13),
+              boxShadow: [BoxShadow(
+                color: AppTheme.primaryPurple.withOpacity(0.4),
+                blurRadius: 12, offset: const Offset(0, 4),
+              )],
+            ),
+            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('PIATRA Assistant',
+                    style: TextStyle(
+                      fontFamily: 'Sora',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
+                    )),
+                Row(
+                  children: [
+                    Container(
+                      width: 7, height: 7,
+                      decoration: const BoxDecoration(
+                        color: AppTheme.successGreen, shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text('Online',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.successGreen.withOpacity(0.9),
+                        )),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessageList(bool isDark) {
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      physics: const BouncingScrollPhysics(),
+      itemCount: _messages.length + (_isLoading ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == _messages.length) return _buildTypingIndicator(isDark);
+        return _buildBubble(_messages[index], isDark, index);
+      },
+    );
+  }
+
+  Widget _buildBubble(ChatMessage message, bool isDark, int index) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+      builder: (_, v, child) => Transform.translate(
+        offset: Offset(0, 12 * (1 - v)),
+        child: Opacity(opacity: v, child: child),
+      ),
+      child: Align(
+        alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.78,
+          ),
+          decoration: BoxDecoration(
+            gradient: message.isUser ? AppTheme.primaryGradient : null,
+            color: message.isUser
+                ? null
+                : isDark
+                    ? AppTheme.cardDark
+                    : Colors.white,
+            borderRadius: BorderRadius.circular(18).copyWith(
+              bottomRight: message.isUser ? const Radius.circular(4) : null,
+              bottomLeft: message.isUser ? null : const Radius.circular(4),
+            ),
+            border: message.isUser
+                ? null
+                : Border.all(
+                    color: isDark
+                        ? const Color(0x18FFFFFF)
+                        : const Color(0x10000000),
+                  ),
+            boxShadow: message.isUser
+                ? [BoxShadow(
+                    color: AppTheme.primaryPurple.withOpacity(0.3),
+                    blurRadius: 12, offset: const Offset(0, 4),
+                  )]
+                : [],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!message.isUser) ...[
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.auto_awesome_rounded,
+                        size: 11, color: AppTheme.primaryPurple),
+                    const SizedBox(width: 4),
+                    Text('PIATRA',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.primaryPurple,
+                          letterSpacing: 0.3,
+                        )),
+                  ],
+                ),
+                const SizedBox(height: 5),
+              ],
+              Text(
+                message.text,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: message.isUser
+                      ? Colors.white
+                      : isDark
+                          ? AppTheme.textPrimaryDark
+                          : AppTheme.textPrimaryLight,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -258,130 +391,145 @@ class _AssistantScreenState extends State<AssistantScreen> {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isDark ? AppTheme.cardDark : Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(16).copyWith(
+          color: isDark ? AppTheme.cardDark : Colors.white,
+          borderRadius: BorderRadius.circular(18).copyWith(
             bottomLeft: const Radius.circular(4),
+          ),
+          border: Border.all(
+            color: isDark ? const Color(0x18FFFFFF) : const Color(0x10000000),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _DotAnimation(color: AppTheme.primaryPurple, delay: 0),
-            const SizedBox(width: 4),
-            _DotAnimation(color: AppTheme.primaryPurple, delay: 200),
-            const SizedBox(width: 4),
-            _DotAnimation(color: AppTheme.primaryPurple, delay: 400),
+            _DotAnim(color: AppTheme.primaryPurple, delay: 0),
+            const SizedBox(width: 5),
+            _DotAnim(color: AppTheme.primaryPurple, delay: 150),
+            const SizedBox(width: 5),
+            _DotAnim(color: AppTheme.primaryPurple, delay: 300),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage message, bool isDark) {
-    final isUser = message.isUser;
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-        decoration: BoxDecoration(
-          gradient: isUser ? AppTheme.primaryGradient : null,
-          color: isUser ? null : (isDark ? AppTheme.cardDark : Colors.grey.shade200),
-          borderRadius: BorderRadius.circular(18).copyWith(
-            bottomRight: isUser ? const Radius.circular(4) : null,
-            bottomLeft: isUser ? null : const Radius.circular(4),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!isUser) ...[
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.auto_awesome_rounded, size: 13, color: AppTheme.primaryPurple),
-                  const SizedBox(width: 4),
-                  Text(
-                    'PIATRA',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryPurple,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-            ],
-            Text(
-              message.text,
-              style: TextStyle(
-                fontSize: 15,
-                height: 1.45,
-                color: isUser
-                    ? Colors.white
-                    : (isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight),
+  Widget _buildSuggestions(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: _suggestions.map((s) => GestureDetector(
+          onTap: () => _sendMessage(s),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryPurple.withOpacity(isDark ? 0.15 : 0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: AppTheme.primaryPurple.withOpacity(0.3),
               ),
             ),
-          ],
-        ),
+            child: Text(
+              s,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.primaryPurple,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        )).toList(),
       ),
     );
   }
 
   Widget _buildInputArea(bool isDark) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.surfaceDark : Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
+        border: Border(
+          top: BorderSide(
+            color: isDark ? const Color(0x18FFFFFF) : const Color(0x10000000),
           ),
-        ],
+        ),
       ),
       child: SafeArea(
         top: false,
         child: Row(
           children: [
             Expanded(
-              child: TextField(
-                controller: _messageController,
-                enabled: !_isLoading,
-                decoration: InputDecoration(
-                  hintText: 'Ask a cooking question…',
-                  filled: true,
-                  fillColor: isDark ? AppTheme.cardDark : Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.cardDark : const Color(0xFFF4F3FF),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? const Color(0x18FFFFFF) : const Color(0x10000000),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
-                maxLines: null,
-                textCapitalization: TextCapitalization.sentences,
-                onSubmitted: (_) => _sendMessage(),
+                child: TextField(
+                  controller: _messageController,
+                  enabled: !_isLoading,
+                  decoration: InputDecoration(
+                    hintText: 'Ask about cooking…',
+                    border: InputBorder.none,
+                    filled: false,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    hintStyle: TextStyle(
+                      color: isDark
+                          ? AppTheme.textSecondaryDark
+                          : AppTheme.textSecondaryLight,
+                    ),
+                  ),
+                  maxLines: null,
+                  textCapitalization: TextCapitalization.sentences,
+                  onSubmitted: (_) => _sendMessage(),
+                ),
               ),
             ),
             const SizedBox(width: 10),
-            GestureDetector(
-              onTap: _isLoading ? null : _sendMessage,
-              child: Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: _isLoading
-                      ? LinearGradient(colors: [Colors.grey.shade400, Colors.grey.shade400])
-                      : AppTheme.primaryGradient,
-                  borderRadius: BorderRadius.circular(14),
+            AnimatedBuilder(
+              animation: _inputScale,
+              builder: (_, child) => Transform.scale(
+                scale: _inputScale.value,
+                child: child,
+              ),
+              child: GestureDetector(
+                onTapDown: (_) => _inputCtrl.reverse(),
+                onTapUp: (_) {
+                  _inputCtrl.forward();
+                  _sendMessage();
+                },
+                onTapCancel: () => _inputCtrl.forward(),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    gradient: _isLoading
+                        ? LinearGradient(colors: [
+                            Colors.grey.shade600,
+                            Colors.grey.shade700
+                          ])
+                        : AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: _isLoading
+                        ? []
+                        : [
+                            BoxShadow(
+                              color: AppTheme.primaryPurple.withOpacity(0.45),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                  ),
+                  child: const Icon(Icons.send_rounded,
+                      color: Colors.white, size: 20),
                 ),
-                child: const Icon(Icons.send_rounded, color: Colors.white, size: 22),
               ),
             ),
           ],
@@ -391,32 +539,31 @@ class _AssistantScreenState extends State<AssistantScreen> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Animated typing dots
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Dot animation ─────────────────────────────────────────────────────────────
 
-class _DotAnimation extends StatefulWidget {
+class _DotAnim extends StatefulWidget {
   final Color color;
   final int delay;
-  const _DotAnimation({required this.color, required this.delay});
+  const _DotAnim({required this.color, required this.delay});
 
   @override
-  State<_DotAnimation> createState() => _DotAnimationState();
+  State<_DotAnim> createState() => _DotAnimState();
 }
 
-class _DotAnimationState extends State<_DotAnimation> with SingleTickerProviderStateMixin {
+class _DotAnimState extends State<_DotAnim>
+    with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
-    _anim = Tween<double>(begin: 0, end: -6)
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 550));
+    _anim = Tween<double>(begin: 0, end: -5)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) _ctrl.repeat(reverse: true);
-    });
+    Future.delayed(Duration(milliseconds: widget.delay),
+        () { if (mounted) _ctrl.repeat(reverse: true); });
   }
 
   @override
@@ -426,22 +573,19 @@ class _DotAnimationState extends State<_DotAnimation> with SingleTickerProviderS
   }
 
   @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (_, __) => Transform.translate(
-        offset: Offset(0, _anim.value),
-        child: Container(
-          width: 7,
-          height: 7,
-          decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _anim,
+        builder: (_, __) => Transform.translate(
+          offset: Offset(0, _anim.value),
+          child: Container(
+            width: 7, height: 7,
+            decoration: BoxDecoration(
+              color: widget.color, shape: BoxShape.circle,
+            ),
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
 
 class ChatMessage {
   final String text;
