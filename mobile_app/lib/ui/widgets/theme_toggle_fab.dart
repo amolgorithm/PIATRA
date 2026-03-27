@@ -14,14 +14,37 @@ class _ThemeToggleFABState extends State<ThemeToggleFAB>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _rotateAnim;
+  late Animation<double> _scaleAnim;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 400),
+      vsync: this,
+      duration: const Duration(milliseconds: 480),
     );
-    _rotateAnim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack);
+    // Half-turn rotation with overshoot
+    _rotateAnim = Tween<double>(begin: 0.0, end: 0.5).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack),
+    );
+    // Squeeze-pop bounce
+    _scaleAnim = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 0.80)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 30,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 0.80, end: 1.15)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 45,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.15, end: 1.0)
+            .chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 25,
+      ),
+    ]).animate(_ctrl);
   }
 
   @override
@@ -36,33 +59,38 @@ class _ThemeToggleFABState extends State<ThemeToggleFAB>
       builder: (context, themeProvider, child) {
         final isDark = themeProvider.isDarkMode;
 
+        // ── FIX: bottom:20 matches the AI assistant FAB height exactly ──
         return Positioned(
-          bottom: 92,
+          bottom: 20,
           left: 20,
           child: GestureDetector(
             onTap: () {
-              _ctrl.forward(from: 0);
+              _ctrl.forward(from: 0.0);
               themeProvider.toggleTheme();
             },
             child: AnimatedBuilder(
-              animation: _rotateAnim,
-              builder: (_, child) => Transform.rotate(
-                angle: _rotateAnim.value * 0.5,
-                child: child,
+              animation: _ctrl,
+              builder: (_, child) => Transform.scale(
+                scale: _scaleAnim.value,
+                child: Transform.rotate(
+                  angle: _rotateAnim.value * 2 * 3.14159265,
+                  child: child,
+                ),
               ),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutCubic,
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
                   gradient: isDark
                       ? const LinearGradient(
-                          colors: [Color(0xFFFFB347), Color(0xFFFF8C00)],
+                          colors: [Color(0xFFFFD166), Color(0xFFFF9500)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         )
                       : const LinearGradient(
-                          colors: [Color(0xFF2A2840), Color(0xFF1A1830)],
+                          colors: [Color(0xFF1C1A30), Color(0xFF0D0C1A)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
@@ -70,17 +98,21 @@ class _ThemeToggleFABState extends State<ThemeToggleFAB>
                   boxShadow: [
                     BoxShadow(
                       color: isDark
-                          ? Colors.amber.withOpacity(0.35)
-                          : Colors.black.withOpacity(0.3),
-                      blurRadius: 16,
-                      offset: const Offset(0, 5),
+                          ? const Color(0xFFFFD166).withOpacity(0.50)
+                          : Colors.black.withOpacity(0.42),
+                      blurRadius: 20,
+                      spreadRadius: 0,
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
+                  duration: const Duration(milliseconds: 260),
                   transitionBuilder: (child, anim) => RotationTransition(
-                    turns: Tween<double>(begin: 0.3, end: 1.0).animate(anim),
+                    turns: Tween<double>(begin: 0.25, end: 1.0).animate(
+                      CurvedAnimation(
+                          parent: anim, curve: Curves.easeOutBack),
+                    ),
                     child: FadeTransition(opacity: anim, child: child),
                   ),
                   child: Icon(

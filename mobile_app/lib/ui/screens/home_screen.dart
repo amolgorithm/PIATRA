@@ -6,7 +6,13 @@ import '../../core/constants/theme/app_theme.dart';
 import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
 import '../../state/user_provider.dart';
+import '../../state/recipe_provider.dart';
 import '../../models/user_profile_model.dart';
+import '../../services/pantry_service.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HomeScreen
+// ─────────────────────────────────────────────────────────────────────────────
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,54 +22,129 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  late AnimationController _headerCtrl;
-  late AnimationController _gridCtrl;
-  late AnimationController _orbCtrl;
+  // ── Animation controllers ─────────────────────────────────────────────────
+  late AnimationController _orbCtrl;      // slow ambient float
+  late AnimationController _headerCtrl;   // header fade+slide in
+  late AnimationController _gridCtrl;     // staggered card entrance
+  late AnimationController _statsCtrl;    // stats count-up
 
   late Animation<double> _headerFade;
   late Animation<Offset> _headerSlide;
   late Animation<double> _gridFade;
   late Animation<double> _orbAnim;
+  late Animation<double> _statsProgress;  // 0→1 drives count-up numbers
+
+  // ── Real overview data ────────────────────────────────────────────────────
+  int _pantryCount     = 0;
+  int _recipesReady    = 0;
+  int _calorieTarget   = 2000;
+  bool _statsLoading   = true;
 
   @override
   void initState() {
     super.initState();
 
+    // Ambient orb drift — loops forever
     _orbCtrl = AnimationController(
-      vsync: this, duration: const Duration(seconds: 8),
+      vsync: this,
+      duration: const Duration(seconds: 9),
     )..repeat(reverse: true);
 
+    // Header enters after 100 ms
     _headerCtrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 700),
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
     );
 
+    // Cards stagger after 300 ms
     _gridCtrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 900),
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
     );
 
-    _headerFade = CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOut);
+    // Stats count-up — starts once data is loaded
+    _statsCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+
+    _headerFade  = CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOut);
     _headerSlide = Tween<Offset>(
       begin: const Offset(0, 0.12), end: Offset.zero,
     ).animate(CurvedAnimation(parent: _headerCtrl, curve: Curves.easeOutCubic));
+    _gridFade    = CurvedAnimation(parent: _gridCtrl,  curve: Curves.easeOut);
+    _orbAnim     = CurvedAnimation(parent: _orbCtrl,   curve: Curves.easeInOut);
+    _statsProgress = CurvedAnimation(parent: _statsCtrl, curve: Curves.easeOutCubic);
 
-    _gridFade = CurvedAnimation(parent: _gridCtrl, curve: Curves.easeOut);
-    _orbAnim = CurvedAnimation(parent: _orbCtrl, curve: Curves.easeInOut);
-
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) _headerCtrl.forward();
-    });
-    Future.delayed(const Duration(milliseconds: 350), () {
-      if (mounted) _gridCtrl.forward();
-    });
+    // Staggered entrance
+    Future.delayed(const Duration(milliseconds: 80),  _startHeader);
+    Future.delayed(const Duration(milliseconds: 300), _startGrid);
+    Future.delayed(const Duration(milliseconds: 150), _loadRealStats);
   }
+
+  // ── Stats loading ─────────────────────────────────────────────────────────
+
+  Future<void> _loadRealStats() async {
+    try {
+      // 1. Pantry count — reads the local SQLite DB directly
+      final items = await PantryService.instance.getAllItems();
+      final pantryCount = items.length;
+
+      // 2. Calorie target — from UserProvider profile (already in memory)
+      final profile = context.read<UserProvider>().profile;
+      final calorieTarget = profile?.calorieTarget ?? 2000;
+
+      // 3. Recipe count — from RecipeProvider if already fetched,
+      //    otherwise kick off a load in background and update when done
+      final recipeProvider = context.read<RecipeProvider>();
+      int recipesReady = recipeProvider.rankedRecipes
+          .where((r) => r.pantryMatchPercent >= 70)
+          .length;
+
+      if (mounted) {
+        setState(() {
+          _pantryCount   = pantryCount;
+          _calorieTarget = calorieTarget;
+          _recipesReady  = recipesReady;
+          _statsLoading  = false;
+        });
+        _statsCtrl.forward();
+      }
+
+      // Kick off recipe fetch in background if not yet done
+      if (recipeProvider.loadState == RecipeLoadState.idle) {
+        final p = profile ?? UserProfileModel.defaultProfile();
+        recipeProvider.loadRecommendations(profile: p).then((_) {
+          if (!mounted) return;
+          final ready = recipeProvider.rankedRecipes
+              .where((r) => r.pantryMatchPercent >= 70)
+              .length;
+          setState(() => _recipesReady = ready);
+          // Re-run count-up for updated number
+          _statsCtrl.forward(from: 0.0);
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _statsLoading = false);
+        _statsCtrl.forward();
+      }
+    }
+  }
+
+  void _startHeader() { if (mounted) _headerCtrl.forward(); }
+  void _startGrid()   { if (mounted) _gridCtrl.forward(); }
 
   @override
   void dispose() {
+    _orbCtrl.dispose();
     _headerCtrl.dispose();
     _gridCtrl.dispose();
-    _orbCtrl.dispose();
+    _statsCtrl.dispose();
     super.dispose();
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -72,13 +153,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Scaffold(
       body: Stack(
         children: [
-          // ── Ambient background ───────────────────────────────────────────
+          // Animated ambient background
           _AmbientBackground(orbAnim: _orbAnim, isDark: isDark),
 
-          // ── Content ──────────────────────────────────────────────────────
           SafeArea(
             child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
               slivers: [
                 SliverToBoxAdapter(child: _buildHeader(isDark)),
                 SliverPadding(
@@ -90,12 +172,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                SliverToBoxAdapter(child: _buildQuickStats(isDark)),
+                SliverToBoxAdapter(child: _buildOverview(isDark)),
+                // Extra bottom padding so content clears the two FABs
                 const SliverToBoxAdapter(child: SizedBox(height: 120)),
               ],
             ),
           ),
 
+          // FABs — ThemeToggle left, AI right, both at bottom:20
           const ThemeToggleFAB(),
           const AIAssistantFAB(),
         ],
@@ -103,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── Header ─────────────────────────────────────────────────────────────────
+  // ── Header ────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(bool isDark) {
     return FadeTransition(
@@ -117,41 +201,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             children: [
               Row(
                 children: [
-                  // Logo badge
-                  Container(
-                    padding: const EdgeInsets.all(11),
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primaryPurple.withOpacity(0.45),
-                          blurRadius: 20,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.restaurant_menu_rounded,
-                      color: Colors.white,
-                      size: 26,
-                    ),
-                  ),
+                  // Pulsing logo chip
+                  _PulsingLogo(),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'PIATRA',
-                          style: TextStyle(
-                            fontFamily: 'Sora',
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 2.5,
-                            color: isDark
-                                ? AppTheme.textPrimaryDark
-                                : AppTheme.textPrimaryLight,
+                        ShaderMask(
+                          shaderCallback: (b) =>
+                              AppTheme.primaryGradient.createShader(b),
+                          blendMode: BlendMode.srcIn,
+                          child: const Text(
+                            'PIATRA',
+                            style: TextStyle(
+                              fontFamily: 'Sora',
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 2.5,
+                              color: Colors.white, // masked by ShaderMask
+                            ),
                           ),
                         ),
                         Text(
@@ -169,35 +238,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                   // Profile avatar
                   GestureDetector(
-                    onTap: () => Navigator.pushNamed(context, AppRoutes.profile),
+                    onTap: () =>
+                        Navigator.pushNamed(context, AppRoutes.profile)
+                            .then((_) => _loadRealStats()),
                     child: Consumer<UserProvider>(
-                      builder: (context, up, _) {
+                      builder: (_, up, __) {
                         final mode = up.profile?.cookingMode;
-                        final initial = (up.profile?.displayName.isNotEmpty == true
-                                ? up.profile!.displayName[0]
-                                : '?')
-                            .toUpperCase();
-                        return Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            gradient: AppTheme.primaryGradient,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primaryPurple.withOpacity(0.3),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Text(
-                              mode?.emoji ?? initial,
-                              style: const TextStyle(fontSize: 18),
-                            ),
-                          ),
-                        );
+                        final initial =
+                            (up.profile?.displayName.isNotEmpty == true
+                                    ? up.profile!.displayName[0]
+                                    : '?')
+                                .toUpperCase();
+                        return _SpringAvatar(
+                            label: mode?.emoji ?? initial);
                       },
                     ),
                   ),
@@ -206,7 +259,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
               const SizedBox(height: 32),
 
-              // Greeting
               Consumer<UserProvider>(
                 builder: (_, up, __) {
                   final name = up.profile?.displayName;
@@ -214,15 +266,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name != null ? 'Hello, $name 👋' : 'What\'s cooking\ntoday?',
-                        style: TextStyle(
-                          fontFamily: 'Sora',
-                          fontSize: name != null ? 28 : 34,
-                          fontWeight: FontWeight.w800,
-                          height: 1.15,
-                          letterSpacing: -0.8,
-                          color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 400),
+                        transitionBuilder: (child, anim) => FadeTransition(
+                          opacity: anim,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.1),
+                              end: Offset.zero,
+                            ).animate(CurvedAnimation(
+                                parent: anim, curve: Curves.easeOut)),
+                            child: child,
+                          ),
+                        ),
+                        child: Text(
+                          name != null
+                              ? 'Hello, $name 👋'
+                              : 'What\'s cooking\ntoday?',
+                          key: ValueKey(name),
+                          style: TextStyle(
+                            fontFamily: 'Sora',
+                            fontSize: name != null ? 28 : 34,
+                            fontWeight: FontWeight.w800,
+                            height: 1.15,
+                            letterSpacing: -0.8,
+                            color: isDark
+                                ? AppTheme.textPrimaryDark
+                                : AppTheme.textPrimaryLight,
+                          ),
                         ),
                       ),
                       if (mode != null) ...[
@@ -240,17 +311,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── Feature grid — 2+2+wide(feedback) layout ──────────────────────────────
+  // ── Feature grid ──────────────────────────────────────────────────────────
 
   Widget _buildFeatureGrid(BuildContext context, bool isDark) {
     return Column(
       children: [
-        // Row 1: Pantry + Scan
         Row(
           children: [
             Expanded(
-              child: _AnimatedFeatureCard(
-                delay: 0,
+              child: _FeatureCard(
+                index: 0,
                 icon: Icons.kitchen_rounded,
                 title: 'My Pantry',
                 description: 'Manage ingredients',
@@ -259,14 +329,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
-                parentAnim: _gridCtrl,
+                onTap: () => Navigator.pushNamed(context, AppRoutes.pantry)
+                    .then((_) => _loadRealStats()),
+                parentCtrl: _gridCtrl,
               ),
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: _AnimatedFeatureCard(
-                delay: 80,
+              child: _FeatureCard(
+                index: 1,
                 icon: Icons.camera_alt_rounded,
                 title: 'Scan Items',
                 description: 'Add with camera',
@@ -275,19 +346,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                onTap: () => Navigator.pushNamed(context, AppRoutes.scan),
-                parentAnim: _gridCtrl,
+                onTap: () => Navigator.pushNamed(context, AppRoutes.scan)
+                    .then((_) => _loadRealStats()),
+                parentCtrl: _gridCtrl,
               ),
             ),
           ],
         ),
         const SizedBox(height: 14),
-        // Row 2: Recipes + Analytics
         Row(
           children: [
             Expanded(
-              child: _AnimatedFeatureCard(
-                delay: 160,
+              child: _FeatureCard(
+                index: 2,
                 icon: Icons.restaurant_rounded,
                 title: 'Recipes',
                 description: 'Find what to cook',
@@ -296,14 +367,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                onTap: () => Navigator.pushNamed(context, AppRoutes.recipes),
-                parentAnim: _gridCtrl,
+                onTap: () => Navigator.pushNamed(context, AppRoutes.recipes)
+                    .then((_) => _loadRealStats()),
+                parentCtrl: _gridCtrl,
               ),
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: _AnimatedFeatureCard(
-                delay: 240,
+              child: _FeatureCard(
+                index: 3,
                 icon: Icons.auto_graph_rounded,
                 title: 'Analytics',
                 description: 'Track nutrition',
@@ -313,15 +385,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   end: Alignment.bottomRight,
                 ),
                 onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
-                parentAnim: _gridCtrl,
+                parentCtrl: _gridCtrl,
               ),
             ),
           ],
         ),
         const SizedBox(height: 14),
-        // Row 3: Feedback — full width, shorter
-        _AnimatedFeatureCard(
-          delay: 320,
+        _FeatureCard(
+          index: 4,
           icon: Icons.feedback_rounded,
           title: 'Send Feedback',
           description: 'Help us improve PIATRA',
@@ -331,16 +402,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             end: Alignment.bottomRight,
           ),
           onTap: () => Navigator.pushNamed(context, AppRoutes.feedback),
-          parentAnim: _gridCtrl,
+          parentCtrl: _gridCtrl,
           isWide: true,
         ),
       ],
     );
   }
 
-  // ── Quick stats ────────────────────────────────────────────────────────────
+  // ── Overview (real stats) ─────────────────────────────────────────────────
 
-  Widget _buildQuickStats(bool isDark) {
+  Widget _buildOverview(bool isDark) {
     return FadeTransition(
       opacity: _gridFade,
       child: Padding(
@@ -348,57 +419,99 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Overview',
-              style: TextStyle(
-                fontFamily: 'Sora',
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
-              ),
-            ),
-            const SizedBox(height: 14),
             Row(
               children: [
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.inventory_2_rounded,
-                    value: '23',
-                    label: 'In Pantry',
-                    color: AppTheme.primaryPurple,
-                    isDark: isDark,
+                Text(
+                  'Overview',
+                  style: TextStyle(
+                    fontFamily: 'Sora',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppTheme.textPrimaryDark
+                        : AppTheme.textPrimaryLight,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.restaurant_menu_rounded,
-                    value: '12',
-                    label: 'Recipes Ready',
-                    color: AppTheme.secondaryTeal,
-                    isDark: isDark,
+                if (_statsLoading) ...[
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppTheme.primaryPurple.withOpacity(0.6),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.local_fire_department_rounded,
-                    value: '1,840',
-                    label: 'kcal Today',
-                    color: AppTheme.accentOrange,
-                    isDark: isDark,
-                  ),
-                ),
+                ],
               ],
+            ),
+            const SizedBox(height: 14),
+            AnimatedBuilder(
+              animation: _statsProgress,
+              builder: (_, __) {
+                final t = _statsProgress.value;
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _StatCard(
+                        icon: Icons.inventory_2_rounded,
+                        value: (_pantryCount * t).round().toString(),
+                        label: 'In Pantry',
+                        color: AppTheme.primaryPurple,
+                        isDark: isDark,
+                        isEmpty: _pantryCount == 0 && !_statsLoading,
+                        emptyLabel: 'Add items',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _StatCard(
+                        icon: Icons.restaurant_menu_rounded,
+                        value: (_recipesReady * t).round().toString(),
+                        label: 'Recipes Ready',
+                        color: AppTheme.secondaryTeal,
+                        isDark: isDark,
+                        isEmpty: _recipesReady == 0 && !_statsLoading,
+                        emptyLabel: 'Add pantry',
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _StatCard(
+                        icon: Icons.local_fire_department_rounded,
+                        value: _formatCalories((_calorieTarget * t).round()),
+                        label: 'kcal Target',
+                        color: AppTheme.accentOrange,
+                        isDark: isDark,
+                        isEmpty: false,
+                        emptyLabel: '',
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         ),
       ),
     );
   }
+
+  String _formatCalories(int val) {
+    if (val >= 1000) {
+      // e.g. 2000 → "2k", 1840 → "1.8k"
+      final k = val / 1000;
+      return k == k.roundToDouble()
+          ? '${k.round()}k'
+          : '${k.toStringAsFixed(1)}k';
+    }
+    return val.toString();
+  }
 }
 
-// ── Ambient background with floating orbs ─────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Ambient background
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _AmbientBackground extends StatelessWidget {
   final Animation<double> orbAnim;
@@ -427,34 +540,31 @@ class _AmbientBackground extends StatelessWidget {
           ),
           child: Stack(
             children: [
-              // Purple orb top-right
               Positioned(
-                top: -60 + t * 20,
-                right: -80 + t * 15,
+                top: -60 + t * 22,
+                right: -80 + t * 16,
                 child: _Orb(
-                  size: 280,
+                  size: 290,
                   color: isDark
                       ? AppTheme.primaryPurple.withOpacity(0.18)
                       : AppTheme.primaryPurple.withOpacity(0.09),
                 ),
               ),
-              // Teal orb middle-left
               Positioned(
-                top: 260 + t * 30,
-                left: -100 + t * 10,
+                top: 260 + t * 32,
+                left: -100 + t * 12,
                 child: _Orb(
-                  size: 220,
+                  size: 230,
                   color: isDark
                       ? AppTheme.secondaryTeal.withOpacity(0.10)
                       : AppTheme.secondaryTeal.withOpacity(0.07),
                 ),
               ),
-              // Orange orb bottom-right
               Positioned(
-                bottom: 100 - t * 20,
-                right: -60 + t * 8,
+                bottom: 100 - t * 22,
+                right: -60 + t * 10,
                 child: _Orb(
-                  size: 180,
+                  size: 190,
                   color: isDark
                       ? AppTheme.accentOrange.withOpacity(0.07)
                       : AppTheme.accentOrange.withOpacity(0.05),
@@ -474,22 +584,155 @@ class _Orb extends StatelessWidget {
   const _Orb({required this.size, required this.color});
 
   @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [color, Colors.transparent],
+            radius: 0.75,
+          ),
+        ),
+      );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pulsing logo
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PulsingLogo extends StatefulWidget {
+  @override
+  State<_PulsingLogo> createState() => _PulsingLogoState();
+}
+
+class _PulsingLogoState extends State<_PulsingLogo>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _glow;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat(reverse: true);
+    _glow = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color, Colors.transparent],
-          radius: 0.75,
+    return AnimatedBuilder(
+      animation: _glow,
+      builder: (_, child) => Container(
+        padding: const EdgeInsets.all(11),
+        decoration: BoxDecoration(
+          gradient: AppTheme.primaryGradient,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.primaryPurple
+                  .withOpacity(0.28 + _glow.value * 0.30),
+              blurRadius: 14 + _glow.value * 10,
+              spreadRadius: _glow.value * 2,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: child,
+      ),
+      child: const Icon(
+        Icons.restaurant_menu_rounded,
+        color: Colors.white,
+        size: 26,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Spring-press avatar
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SpringAvatar extends StatefulWidget {
+  final String label;
+  const _SpringAvatar({required this.label});
+
+  @override
+  State<_SpringAvatar> createState() => _SpringAvatarState();
+}
+
+class _SpringAvatarState extends State<_SpringAvatar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 140),
+      lowerBound: 0.88,
+      upperBound: 1.0,
+      value: 1.0,
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _ctrl.animateTo(0.88,
+          curve: Curves.easeOut,
+          duration: const Duration(milliseconds: 100)),
+      onTapUp: (_) => _ctrl.animateTo(1.0,
+          curve: Curves.elasticOut,
+          duration: const Duration(milliseconds: 400)),
+      onTapCancel: () => _ctrl.animateTo(1.0,
+          curve: Curves.elasticOut,
+          duration: const Duration(milliseconds: 400)),
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (_, child) =>
+            Transform.scale(scale: _ctrl.value, child: child),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            gradient: AppTheme.primaryGradient,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryPurple.withOpacity(0.38),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(widget.label, style: const TextStyle(fontSize: 18)),
+          ),
         ),
       ),
     );
   }
 }
 
-// ── Cooking mode badge ────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Mode badge
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _ModeBadge extends StatelessWidget {
   final CookingMode mode;
@@ -505,8 +748,8 @@ class _ModeBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: colors.first.withOpacity(0.4),
-            blurRadius: 12,
+            color: colors.first.withOpacity(0.42),
+            blurRadius: 14,
             offset: const Offset(0, 4),
           ),
         ],
@@ -519,7 +762,9 @@ class _ModeBadge extends StatelessWidget {
           Text(
             '${mode.label} Mode',
             style: const TextStyle(
-              color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600,
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
               letterSpacing: 0.2,
             ),
           ),
@@ -529,65 +774,73 @@ class _ModeBadge extends StatelessWidget {
   }
 }
 
-// ── Animated feature card ─────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Feature card with staggered entrance + spring press
+// ─────────────────────────────────────────────────────────────────────────────
 
-class _AnimatedFeatureCard extends StatefulWidget {
-  final int delay;
+class _FeatureCard extends StatefulWidget {
+  final int index;
   final IconData icon;
   final String title;
   final String description;
   final Gradient gradient;
   final VoidCallback onTap;
-  final AnimationController parentAnim;
+  final AnimationController parentCtrl;
   final bool isWide;
 
-  const _AnimatedFeatureCard({
-    required this.delay,
+  const _FeatureCard({
+    required this.index,
     required this.icon,
     required this.title,
     required this.description,
     required this.gradient,
     required this.onTap,
-    required this.parentAnim,
+    required this.parentCtrl,
     this.isWide = false,
   });
 
   @override
-  State<_AnimatedFeatureCard> createState() => _AnimatedFeatureCardState();
+  State<_FeatureCard> createState() => _FeatureCardState();
 }
 
-class _AnimatedFeatureCardState extends State<_AnimatedFeatureCard>
+class _FeatureCardState extends State<_FeatureCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _pressCtrl;
-  late Animation<double> _pressAnim;
-  late Animation<Offset> _slideAnim;
-  late Animation<double> _fadeAnim;
+  late Animation<double> _pressScale;
+  late Animation<Offset> _slideIn;
+  late Animation<double> _fadeIn;
 
   @override
   void initState() {
     super.initState();
+
+    // Spring press controller
     _pressCtrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 120),
-      lowerBound: 0.96, upperBound: 1.0, value: 1.0,
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+      lowerBound: 0.94,
+      upperBound: 1.0,
+      value: 1.0,
     );
-    _pressAnim = _pressCtrl;
+    _pressScale = _pressCtrl;
 
-    // Staggered entry: slide up + fade in
-    final delayFrac = widget.delay / 1000.0;
-    final begin = delayFrac.clamp(0.0, 0.8);
-    final end = (begin + 0.4).clamp(0.0, 1.0);
+    // Staggered entrance driven by parent
+    final stagger = widget.index * 0.08;
+    final start  = stagger.clamp(0.0, 0.75);
+    final end    = (stagger + 0.38).clamp(0.0, 1.0);
 
-    _slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.25), end: Offset.zero,
+    _slideIn = Tween<Offset>(
+      begin: const Offset(0, 0.28),
+      end: Offset.zero,
     ).animate(CurvedAnimation(
-      parent: widget.parentAnim,
-      curve: Interval(begin, end, curve: Curves.easeOutCubic),
+      parent: widget.parentCtrl,
+      curve: Interval(start, end, curve: Curves.easeOutCubic),
     ));
 
-    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(
+    _fadeIn = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
-        parent: widget.parentAnim,
-        curve: Interval(begin, end, curve: Curves.easeOut),
+        parent: widget.parentCtrl,
+        curve: Interval(start, end, curve: Curves.easeOut),
       ),
     );
   }
@@ -601,40 +854,60 @@ class _AnimatedFeatureCardState extends State<_AnimatedFeatureCard>
   @override
   Widget build(BuildContext context) {
     return FadeTransition(
-      opacity: _fadeAnim,
+      opacity: _fadeIn,
       child: SlideTransition(
-        position: _slideAnim,
+        position: _slideIn,
         child: GestureDetector(
           onTapDown: (_) => _pressCtrl.reverse(),
-          onTapUp: (_) {
-            _pressCtrl.forward();
-            widget.onTap();
-          },
+          onTapUp: (_) { _pressCtrl.forward(); widget.onTap(); },
           onTapCancel: () => _pressCtrl.forward(),
           child: AnimatedBuilder(
-            animation: _pressAnim,
-            builder: (_, child) => Transform.scale(
-              scale: _pressAnim.value,
-              child: child,
+            animation: _pressScale,
+            builder: (_, child) =>
+                Transform.scale(scale: _pressScale.value, child: child),
+            child: _CardBody(
+              icon: widget.icon,
+              title: widget.title,
+              description: widget.description,
+              gradient: widget.gradient,
+              isWide: widget.isWide,
             ),
-            child: _buildCard(),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildCard() {
-    final isWide = widget.isWide;
+class _CardBody extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String description;
+  final Gradient gradient;
+  final bool isWide;
+
+  const _CardBody({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.gradient,
+    required this.isWide,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final primaryColor =
+        (gradient as LinearGradient).colors.first;
+
     return Container(
       height: isWide ? 80 : 148,
       decoration: BoxDecoration(
-        gradient: widget.gradient,
+        gradient: gradient,
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: (widget.gradient as LinearGradient).colors.first.withOpacity(0.35),
-            blurRadius: 18,
+            color: primaryColor.withOpacity(0.38),
+            blurRadius: 20,
             offset: const Offset(0, 8),
           ),
         ],
@@ -643,106 +916,98 @@ class _AnimatedFeatureCardState extends State<_AnimatedFeatureCard>
         borderRadius: BorderRadius.circular(22),
         child: Stack(
           children: [
-            // Subtle shimmer in top-right corner
+            // Decorative circles
             Positioned(
-              top: -20,
-              right: -20,
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.08),
-                ),
-              ),
+              top: -20, right: -20,
+              child: _circle(80, 0.08),
             ),
             Positioned(
-              top: -40,
-              right: -10,
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
-                ),
-              ),
+              top: -40, right: -10,
+              child: _circle(120, 0.05),
             ),
-            // Content
             if (isWide)
-              // Wide layout: horizontal
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 0),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(widget.icon, color: Colors.white, size: 22),
-                    ),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(widget.title, style: const TextStyle(
-                          color: Colors.white, fontSize: 16,
-                          fontWeight: FontWeight.w700, letterSpacing: -0.2,
-                        )),
-                        Text(widget.description, style: TextStyle(
-                          color: Colors.white.withOpacity(0.75), fontSize: 12,
-                        )),
-                      ],
-                    ),
-                    const Spacer(),
-                    Icon(Icons.arrow_forward_rounded,
-                        color: Colors.white.withOpacity(0.6), size: 20),
-                  ],
-                ),
-              )
+              _wideContent()
             else
-              // Tall layout: vertical
-              Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(11),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(widget.icon, color: Colors.white, size: 26),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.title, style: const TextStyle(
-                          color: Colors.white, fontSize: 16,
-                          fontWeight: FontWeight.w700, letterSpacing: -0.2,
-                        )),
-                        const SizedBox(height: 2),
-                        Text(widget.description, style: TextStyle(
-                          color: Colors.white.withOpacity(0.75), fontSize: 12,
-                        )),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              _tallContent(),
           ],
         ),
       ),
     );
   }
+
+  Widget _circle(double size, double opacity) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withOpacity(opacity),
+        ),
+      );
+
+  Widget _wideContent() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 22),
+        child: Row(
+          children: [
+            _iconChip(),
+            const SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [_titleText(), const SizedBox(height: 2), _descText()],
+            ),
+            const Spacer(),
+            Icon(Icons.arrow_forward_rounded,
+                color: Colors.white.withOpacity(0.65), size: 20),
+          ],
+        ),
+      );
+
+  Widget _tallContent() => Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _iconChip(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [_titleText(), const SizedBox(height: 2), _descText()],
+            ),
+          ],
+        ),
+      );
+
+  Widget _iconChip() => Container(
+        padding: const EdgeInsets.all(isWide ? 10 : 11),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.18),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(icon, color: Colors.white, size: isWide ? 22 : 26),
+      );
+
+  Widget _titleText() => Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+        ),
+      );
+
+  Widget _descText() => Text(
+        description,
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.76),
+          fontSize: 12,
+        ),
+      );
 }
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Real stat card with count-up (driven by parent AnimatedBuilder)
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _StatCard extends StatelessWidget {
   final IconData icon;
@@ -750,6 +1015,8 @@ class _StatCard extends StatelessWidget {
   final String label;
   final Color color;
   final bool isDark;
+  final bool isEmpty;
+  final String emptyLabel;
 
   const _StatCard({
     required this.icon,
@@ -757,6 +1024,8 @@ class _StatCard extends StatelessWidget {
     required this.label,
     required this.color,
     required this.isDark,
+    required this.isEmpty,
+    required this.emptyLabel,
   });
 
   @override
@@ -775,7 +1044,7 @@ class _StatCard extends StatelessWidget {
             ? []
             : [
                 BoxShadow(
-                  color: color.withOpacity(0.08),
+                  color: color.withOpacity(0.09),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
@@ -793,22 +1062,43 @@ class _StatCard extends StatelessWidget {
             child: Icon(icon, color: color, size: 18),
           ),
           const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'Sora',
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
-              letterSpacing: -0.5,
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            transitionBuilder: (child, anim) => FadeTransition(
+              opacity: anim,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 0.25),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                    parent: anim, curve: Curves.easeOut)),
+                child: child,
+              ),
+            ),
+            child: Text(
+              value,
+              key: ValueKey(value),
+              style: TextStyle(
+                fontFamily: 'Sora',
+                fontSize: value.length > 4 ? 16 : 20,
+                fontWeight: FontWeight.w800,
+                color: isDark
+                    ? AppTheme.textPrimaryDark
+                    : AppTheme.textPrimaryLight,
+                letterSpacing: -0.5,
+              ),
             ),
           ),
           const SizedBox(height: 2),
           Text(
-            label,
+            isEmpty ? emptyLabel : label,
             style: TextStyle(
               fontSize: 11,
-              color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight,
+              color: isEmpty
+                  ? color.withOpacity(0.7)
+                  : (isDark
+                      ? AppTheme.textSecondaryDark
+                      : AppTheme.textSecondaryLight),
             ),
           ),
         ],
