@@ -632,7 +632,7 @@ class _PulsingLogoState extends State<_PulsingLogo>
     return AnimatedBuilder(
       animation: _glow,
       builder: (_, child) => Container(
-        padding: const EdgeInsets.all(11),
+        padding: EdgeInsets.all(11),
         decoration: BoxDecoration(
           gradient: AppTheme.primaryGradient,
           borderRadius: BorderRadius.circular(16),
@@ -963,7 +963,7 @@ class _CardBody extends StatelessWidget {
       );
 
   Widget _tallContent() => Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -978,7 +978,7 @@ class _CardBody extends StatelessWidget {
       );
 
   Widget _iconChip() => Container(
-        padding: const EdgeInsets.all(isWide ? 10 : 11),
+        padding: EdgeInsets.all(isWide ? 10 : 11),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.18),
           borderRadius: BorderRadius.circular(14),
@@ -1031,7 +1031,7 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.cardDark : Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -1054,7 +1054,7 @@ class _StatCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withOpacity(0.12),
               borderRadius: BorderRadius.circular(10),
