@@ -23,8 +23,9 @@ class AppConfig {
       _useProduction ? _productionUrl : _devUrl;
 
   // Pre-built endpoint paths
-  static String get assistantChatUrl    => '$baseUrl/api/assistant/chat';
-  static String get assistantBaseUrl    => '$baseUrl/api/assistant';
-  static String get nutritionAdviceUrl  => '$baseUrl/api/assistant/nutrition-advice';
+  static String get assistantChatUrl     => '$baseUrl/api/assistant/chat';
+  static String get assistantBaseUrl     => '$baseUrl/api/assistant';
+  static String get nutritionAdviceUrl   => '$baseUrl/api/assistant/nutrition-advice';
   static String get recipeSuggestionsUrl => '$baseUrl/api/assistant/recipe-suggestions';
+  static String get feedbackUrl          => '$baseUrl/api/feedback';
 }

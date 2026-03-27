@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import assistant, nutrition, pantry, recipes, users
+from app.api import assistant, nutrition, pantry, recipes, users, feedback
 
 app = FastAPI(title="PIATRA Backend API", version="1.0.0")
 
@@ -20,6 +20,7 @@ app.include_router(nutrition, prefix="/api/nutrition", tags=["nutrition"])
 app.include_router(pantry, prefix="/api/pantry", tags=["pantry"])
 app.include_router(recipes, prefix="/api/recipes", tags=["recipes"])
 app.include_router(users, prefix="/api/users", tags=["users"])
+app.include_router(feedback, prefix="/api/feedback", tags=["feedback"])
 
 @app.get("/")
 async def root():
