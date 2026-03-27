@@ -6,7 +6,6 @@ import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
 import '../../state/user_provider.dart';
 import '../../models/user_profile_model.dart';
-import 'feedback_form_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -343,10 +342,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             end: Alignment.bottomRight,
           ),
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FeedbackFormScreen()),
-            );
+            debugPrint('Feedback card tapped');
+            Navigator.pushNamed(context, AppRoutes.feedback);
           },
           parentAnim: _gridCtrl,
           isWide: true,
