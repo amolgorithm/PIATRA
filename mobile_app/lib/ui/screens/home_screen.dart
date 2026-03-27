@@ -631,11 +631,9 @@ class _AnimatedFeatureCardState extends State<_AnimatedFeatureCard>
         position: _slideAnim,
         child: GestureDetector(
           onTapDown: (_) => _pressCtrl.reverse(),
-          onTapUp: (_) {
-            _pressCtrl.forward();
-            widget.onTap();
-          },
+          onTapUp: (_) => _pressCtrl.forward(),
           onTapCancel: () => _pressCtrl.forward(),
+          onTap: widget.onTap,
           child: AnimatedBuilder(
             animation: _pressAnim,
             builder: (_, child) => Transform.scale(

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../../models/pantry_item.dart';
+import 'feedback_form_screen.dart';
 import '../widgets/ingredient_card.dart';
 import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
@@ -20,9 +21,9 @@ class _PantryScreenState extends State<PantryScreen>
     with TickerProviderStateMixin {
   // ── State ─────────────────────────────────────────────────────────────────
   String _selectedFilter = 'All';
-  String _searchQuery    = '';
-  bool   _showSearch     = false;
-  final List<PantryItem>          _pantryItems   = [];
+  String _searchQuery = '';
+  bool _showSearch = false;
+  final List<PantryItem> _pantryItems = [];
   StreamSubscription<List<PantryItem>>? _syncSub;
   final TextEditingController _searchCtrl = TextEditingController();
 
@@ -38,23 +39,33 @@ class _PantryScreenState extends State<PantryScreen>
     super.initState();
 
     _entranceCtrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 600),
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
     );
     _searchBarCtrl = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 280),
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
     );
 
-    _entranceFade  = CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOut);
+    _entranceFade =
+        CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOut);
     _entranceSlide = Tween<Offset>(
-      begin: const Offset(0, 0.08), end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOutCubic));
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(
+        CurvedAnimation(parent: _entranceCtrl, curve: Curves.easeOutCubic));
 
-    _searchBarSize = CurvedAnimation(
-        parent: _searchBarCtrl, curve: Curves.easeOutCubic);
+    _searchBarSize =
+        CurvedAnimation(parent: _searchBarCtrl, curve: Curves.easeOutCubic);
 
     PantrySyncManager.instance.start();
     _syncSub = PantrySyncManager.instance.localStream.listen((items) {
-      if (mounted) setState(() { _pantryItems..clear()..addAll(items); });
+      if (mounted)
+        setState(() {
+          _pantryItems
+            ..clear()
+            ..addAll(items);
+        });
     });
 
     _entranceCtrl.forward();
@@ -84,8 +95,7 @@ class _PantryScreenState extends State<PantryScreen>
       case 'Fruits':
         base = _pantryItems
             .where((i) =>
-                i.category.toLowerCase() ==
-                _selectedFilter.toLowerCase())
+                i.category.toLowerCase() == _selectedFilter.toLowerCase())
             .toList();
         break;
       default:
@@ -117,7 +127,7 @@ class _PantryScreenState extends State<PantryScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final items  = _filtered;
+    final items = _filtered;
 
     return Scaffold(
       body: Stack(
@@ -140,8 +150,7 @@ class _PantryScreenState extends State<PantryScreen>
                         child: _SearchField(
                           controller: _searchCtrl,
                           isDark: isDark,
-                          onChanged: (v) =>
-                              setState(() => _searchQuery = v),
+                          onChanged: (v) => setState(() => _searchQuery = v),
                         ),
                       ),
                     ),
@@ -179,14 +188,15 @@ class _PantryScreenState extends State<PantryScreen>
         child: Stack(
           children: [
             Positioned(
-              top: -60, right: -80,
+              top: -60,
+              right: -80,
               child: Container(
-                width: 220, height: 220,
+                width: 220,
+                height: 220,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(colors: [
-                    AppTheme.primaryPurple
-                        .withOpacity(isDark ? 0.15 : 0.07),
+                    AppTheme.primaryPurple.withOpacity(isDark ? 0.15 : 0.07),
                     Colors.transparent,
                   ]),
                 ),
@@ -225,11 +235,20 @@ class _PantryScreenState extends State<PantryScreen>
             ),
           ),
           _GlassBtn(
-            icon: _showSearch
-                ? Icons.search_off_rounded
-                : Icons.search_rounded,
+            icon: _showSearch ? Icons.search_off_rounded : Icons.search_rounded,
             isDark: isDark,
             onTap: _toggleSearch,
+          ),
+          const SizedBox(width: 8),
+          _GlassBtn(
+            icon: Icons.feedback_rounded,
+            isDark: isDark,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FeedbackFormScreen()),
+              );
+            },
           ),
           const SizedBox(width: 8),
           _GradientBtn(icon: Icons.add_rounded, onTap: _showAddDialog),
@@ -240,24 +259,43 @@ class _PantryScreenState extends State<PantryScreen>
 
   Widget _buildStats(bool isDark) {
     final expiring = _pantryItems.where((i) => i.isExpiringSoon).length;
-    final expired  = _pantryItems.where((i) => i.isExpired).length;
+    final expired = _pantryItems.where((i) => i.isExpired).length;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
       child: Row(
         children: [
-          _MiniStat(label: 'Total',    value: '${_pantryItems.length}', color: AppTheme.primaryPurple,  isDark: isDark),
+          _MiniStat(
+              label: 'Total',
+              value: '${_pantryItems.length}',
+              color: AppTheme.primaryPurple,
+              isDark: isDark),
           const SizedBox(width: 10),
-          _MiniStat(label: 'Expiring', value: '$expiring',             color: AppTheme.warningYellow,  isDark: isDark),
+          _MiniStat(
+              label: 'Expiring',
+              value: '$expiring',
+              color: AppTheme.warningYellow,
+              isDark: isDark),
           const SizedBox(width: 10),
-          _MiniStat(label: 'Expired',  value: '$expired',              color: AppTheme.errorRed,       isDark: isDark),
+          _MiniStat(
+              label: 'Expired',
+              value: '$expired',
+              color: AppTheme.errorRed,
+              isDark: isDark),
         ],
       ),
     );
   }
 
   Widget _buildFilterBar(bool isDark) {
-    const filters = ['All', 'Expiring Soon', 'Vegetables', 'Dairy', 'Meat', 'Fruits'];
+    const filters = [
+      'All',
+      'Expiring Soon',
+      'Vegetables',
+      'Dairy',
+      'Meat',
+      'Fruits'
+    ];
     return SizedBox(
       height: 40,
       child: ListView.separated(
@@ -323,9 +361,7 @@ class _PantryScreenState extends State<PantryScreen>
               ],
             ),
             child: Icon(
-              isSearching
-                  ? Icons.search_off_rounded
-                  : Icons.kitchen_outlined,
+              isSearching ? Icons.search_off_rounded : Icons.kitchen_outlined,
               size: 56,
               color: Colors.white,
             ),
@@ -364,10 +400,10 @@ class _PantryScreenState extends State<PantryScreen>
   void _showAddDialog() => _showAddEditDialog();
 
   void _showAddEditDialog({PantryItem? item}) {
-    final isNew  = item == null;
+    final isNew = item == null;
     final namCtrl = TextEditingController(text: item?.name ?? '');
     final qtyCtrl = TextEditingController(text: item?.quantity ?? '');
-    String    cat    = item?.category ?? 'Other';
+    String cat = item?.category ?? 'Other';
     DateTime? expiry = item?.expiryDate;
 
     showDialog(
@@ -394,14 +430,18 @@ class _PantryScreenState extends State<PantryScreen>
                   value: cat,
                   decoration: const InputDecoration(labelText: 'Category'),
                   items: const [
-                    DropdownMenuItem(value: 'Vegetables',      child: Text('🥦 Vegetables')),
-                    DropdownMenuItem(value: 'Fruits',          child: Text('🍎 Fruits')),
-                    DropdownMenuItem(value: 'Dairy',           child: Text('🥛 Dairy')),
-                    DropdownMenuItem(value: 'Meat',            child: Text('🥩 Meat')),
-                    DropdownMenuItem(value: 'Grains & Legumes',child: Text('🌾 Grains & Legumes')),
-                    DropdownMenuItem(value: 'Beverages',       child: Text('🧃 Beverages')),
-                    DropdownMenuItem(value: 'Bakery',          child: Text('🍞 Bakery')),
-                    DropdownMenuItem(value: 'Other',           child: Text('📦 Other')),
+                    DropdownMenuItem(
+                        value: 'Vegetables', child: Text('🥦 Vegetables')),
+                    DropdownMenuItem(value: 'Fruits', child: Text('🍎 Fruits')),
+                    DropdownMenuItem(value: 'Dairy', child: Text('🥛 Dairy')),
+                    DropdownMenuItem(value: 'Meat', child: Text('🥩 Meat')),
+                    DropdownMenuItem(
+                        value: 'Grains & Legumes',
+                        child: Text('🌾 Grains & Legumes')),
+                    DropdownMenuItem(
+                        value: 'Beverages', child: Text('🧃 Beverages')),
+                    DropdownMenuItem(value: 'Bakery', child: Text('🍞 Bakery')),
+                    DropdownMenuItem(value: 'Other', child: Text('📦 Other')),
                   ],
                   onChanged: (v) => setS(() => cat = v ?? 'Other'),
                 ),
@@ -447,18 +487,23 @@ class _PantryScreenState extends State<PantryScreen>
             ElevatedButton(
               onPressed: () {
                 final name = namCtrl.text.trim();
-                final qty  = qtyCtrl.text.trim();
+                final qty = qtyCtrl.text.trim();
                 if (name.isEmpty || qty.isEmpty) return;
                 if (isNew) {
                   PantrySyncManager.instance.addItem(PantryItem(
                     id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: name, quantity: qty,
-                    expiryDate: expiry, category: cat,
+                    name: name,
+                    quantity: qty,
+                    expiryDate: expiry,
+                    category: cat,
                   ));
                 } else {
                   PantrySyncManager.instance.updateItem(PantryItem(
-                    id: item!.id, name: name, quantity: qty,
-                    expiryDate: expiry, category: cat,
+                    id: item!.id,
+                    name: name,
+                    quantity: qty,
+                    expiryDate: expiry,
+                    category: cat,
                   ));
                 }
                 Navigator.pop(ctx);
@@ -472,9 +517,21 @@ class _PantryScreenState extends State<PantryScreen>
   }
 
   String _fmt(DateTime d) {
-    const m = ['Jan','Feb','Mar','Apr','May','Jun',
-                'Jul','Aug','Sep','Oct','Nov','Dec'];
-    return '${m[d.month-1]} ${d.day}, ${d.year}';
+    const m = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    return '${m[d.month - 1]} ${d.day}, ${d.year}';
   }
 }
 
@@ -537,28 +594,25 @@ class _GlassBtn extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
         onTap: onTap,
         child: Container(
-          width: 44, height: 44,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             color: isDark ? AppTheme.cardDark : Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isDark
-                  ? const Color(0x18FFFFFF)
-                  : const Color(0x10000000),
+              color: isDark ? const Color(0x18FFFFFF) : const Color(0x10000000),
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black
-                    .withOpacity(isDark ? 0.24 : 0.06),
+                color: Colors.black.withOpacity(isDark ? 0.24 : 0.06),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
             ],
           ),
           child: Icon(icon,
-              color: isDark
-                  ? AppTheme.textPrimaryDark
-                  : AppTheme.textPrimaryLight,
+              color:
+                  isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
               size: 20),
         ),
       );
@@ -573,7 +627,8 @@ class _GradientBtn extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
         onTap: onTap,
         child: Container(
-          width: 44, height: 44,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
             gradient: AppTheme.primaryGradient,
             borderRadius: BorderRadius.circular(14),
@@ -596,8 +651,10 @@ class _MiniStat extends StatelessWidget {
   final Color color;
   final bool isDark;
   const _MiniStat({
-    required this.label, required this.value,
-    required this.color, required this.isDark,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.isDark,
   });
 
   @override
@@ -619,8 +676,8 @@ class _MiniStat extends StatelessWidget {
                     position: Tween<Offset>(
                       begin: const Offset(0, 0.4),
                       end: Offset.zero,
-                    ).animate(CurvedAnimation(
-                        parent: anim, curve: Curves.easeOut)),
+                    ).animate(
+                        CurvedAnimation(parent: anim, curve: Curves.easeOut)),
                     child: child,
                   ),
                 ),
@@ -657,8 +714,10 @@ class _FilterChip extends StatelessWidget {
   final bool isDark;
   final VoidCallback onTap;
   const _FilterChip({
-    required this.label, required this.isSelected,
-    required this.isDark, required this.onTap,
+    required this.label,
+    required this.isSelected,
+    required this.isDark,
+    required this.onTap,
   });
 
   @override
@@ -697,8 +756,7 @@ class _FilterChip extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 13,
-              fontWeight:
-                  isSelected ? FontWeight.w600 : FontWeight.w500,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
               color: isSelected
                   ? Colors.white
                   : isDark
@@ -714,8 +772,7 @@ class _FilterChip extends StatelessWidget {
 class _StaggeredTile extends StatefulWidget {
   final int delayMs;
   final Widget child;
-  const _StaggeredTile(
-      {required this.delayMs, required this.child, super.key});
+  const _StaggeredTile({required this.delayMs, required this.child, super.key});
 
   @override
   State<_StaggeredTile> createState() => _StaggeredTileState();
@@ -736,9 +793,9 @@ class _StaggeredTileState extends State<_StaggeredTile>
     );
     _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
     _slide = Tween<Offset>(
-      begin: const Offset(0, 0.14), end: Offset.zero,
-    ).animate(
-        CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+      begin: const Offset(0, 0.14),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
 
     Future.delayed(Duration(milliseconds: widget.delayMs), () {
       if (mounted) _ctrl.forward();
