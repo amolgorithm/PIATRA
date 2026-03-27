@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routes/app_routes.dart';
@@ -268,10 +267,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 title: 'My Pantry',
                 description: 'Manage ingredients',
                 gradient: const LinearGradient(
-                  colors: [
-                    Color.fromARGB(255, 255, 179, 37),
-                    Color.fromARGB(255, 237, 139, 48)
-                  ],
+                  colors: [Color(0xFF6C63FF), Color(0xFF5B54E8)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -287,10 +283,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 title: 'Scan Items',
                 description: 'Add with camera',
                 gradient: const LinearGradient(
-                  colors: [
-                    Color.fromARGB(255, 246, 162, 52),
-                    Color.fromARGB(255, 237, 160, 59)
-                  ],
+                  colors: [Color(0xFF00D4AA), Color(0xFF00B894)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -311,10 +304,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 title: 'Recipes',
                 description: 'Find what to cook',
                 gradient: const LinearGradient(
-                  colors: [
-                    Color.fromARGB(255, 237, 147, 43),
-                    Color.fromARGB(255, 249, 146, 29)
-                  ],
+                  colors: [Color(0xFFFF6B6B), Color(0xFFEE5A6F)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -330,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 title: 'Analytics',
                 description: 'Track nutrition',
                 gradient: const LinearGradient(
-                  colors: [Color(0xFFFFB347), Color(0xFFFF8C00)],
+                  colors: [Color(0xFFFFB800), Color(0xFFFFA000)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -348,20 +338,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           title: 'Send Feedback',
           description: 'Help us improve PIATRA',
           gradient: const LinearGradient(
-            colors: [Color(0xFFB24BF3), Color(0xFF8B3FCF)],
+            colors: [Color(0xFFB24BF3), Color(0xFF9D3FDD)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           onTap: () {
-            try {
-              Navigator.pushNamed(context, AppRoutes.feedback);
-            } catch (e, st) {
-              debugPrint('Feedback navigation failed: $e\n$st');
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FeedbackFormScreen()),
-              );
-            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FeedbackFormScreen()),
+            );
           },
           parentAnim: _gridCtrl,
           isWide: true,
