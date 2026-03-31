@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../../models/pantry_item.dart';
-import 'feedback_form_screen.dart';
+import '../../routes/app_routes.dart';
 import '../widgets/ingredient_card.dart';
 import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
@@ -244,10 +244,8 @@ class _PantryScreenState extends State<PantryScreen>
             icon: Icons.feedback_rounded,
             isDark: isDark,
             onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FeedbackFormScreen()),
-              );
+              debugPrint('Pantry feedback button tapped');
+              Navigator.pushNamed(context, AppRoutes.feedback);
             },
           ),
           const SizedBox(width: 8),
