@@ -27,5 +27,8 @@ class AppConfig {
   static String get assistantBaseUrl     => '$baseUrl/api/assistant';
   static String get nutritionAdviceUrl   => '$baseUrl/api/assistant/nutrition-advice';
   static String get recipeSuggestionsUrl => '$baseUrl/api/assistant/recipe-suggestions';
-  static String get feedbackUrl          => '$baseUrl/api/feedback';
+
+  // Trailing slash required — FastAPI redirects /api/feedback → /api/feedback/
+  // without it, causing a 307 that drops the POST body.
+  static String get feedbackUrl          => '$baseUrl/api/feedback/';
 }
