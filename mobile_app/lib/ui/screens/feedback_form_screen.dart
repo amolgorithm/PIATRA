@@ -135,11 +135,12 @@ class _CustomButtonState extends State<CustomButton> {
   Widget build(BuildContext context) {
     return ElevatedButton(
       onPressed: _isPressed
-          ? null
-          : () {
-              setState(() => _isPressed = true);
-              widget.onPressed();
-            },
+        ? null
+        : () async {
+            setState(() => _isPressed = true);
+            await Future(() => widget.onPressed());
+            if (mounted) setState(() => _isPressed = false);
+          },
       style: ElevatedButton.styleFrom(
         backgroundColor: _isPressed
             ? Colors.green

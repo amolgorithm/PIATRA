@@ -6,7 +6,6 @@ import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
 import '../../state/user_provider.dart';
 import '../../models/user_profile_model.dart';
-import 'feedback_form_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -94,8 +93,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                SliverToBoxAdapter(child: _buildQuickStats(isDark)),
-                const SliverToBoxAdapter(child: SizedBox(height: 120)),
+                // Bottom padding so FABs don't overlap last row
+                const SliverToBoxAdapter(child: SizedBox(height: 110)),
               ],
             ),
           ),
@@ -252,166 +251,117 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ── Feature grid — 2+2+wide(feedback) layout ──────────────────────────────
+  // ── Feature grid — true 2×3 layout ────────────────────────────────────────
+  //
+  // Row 1: Pantry    | Scan
+  // Row 2: Recipes   | Analytics
+  // Row 3: Feedback  | Overview (mini stats)
 
   Widget _buildFeatureGrid(BuildContext context, bool isDark) {
     return Column(
       children: [
         // Row 1: Pantry + Scan
-        Row(
-          children: [
-            Expanded(
-              child: _AnimatedFeatureCard(
-                delay: 0,
-                icon: Icons.kitchen_rounded,
-                title: 'My Pantry',
-                description: 'Manage ingredients',
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6C63FF), Color(0xFF5B54E8)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
-                parentAnim: _gridCtrl,
-              ),
+        _GridRow(children: [
+          _AnimatedFeatureCard(
+            delay: 0,
+            icon: Icons.kitchen_rounded,
+            title: 'My Pantry',
+            description: 'Manage ingredients',
+            gradient: const LinearGradient(
+              colors: [Color(0xFF6C63FF), Color(0xFF5B54E8)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: _AnimatedFeatureCard(
-                delay: 80,
-                icon: Icons.camera_alt_rounded,
-                title: 'Scan Items',
-                description: 'Add with camera',
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF00D4AA), Color(0xFF00B894)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                onTap: () => Navigator.pushNamed(context, AppRoutes.scan),
-                parentAnim: _gridCtrl,
-              ),
+            onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
+            parentAnim: _gridCtrl,
+          ),
+          _AnimatedFeatureCard(
+            delay: 80,
+            icon: Icons.camera_alt_rounded,
+            title: 'Scan Items',
+            description: 'Add with camera',
+            gradient: const LinearGradient(
+              colors: [Color(0xFF00D4AA), Color(0xFF00B894)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
-        ),
+            onTap: () => Navigator.pushNamed(context, AppRoutes.scan),
+            parentAnim: _gridCtrl,
+          ),
+        ]),
         const SizedBox(height: 14),
         // Row 2: Recipes + Analytics
-        Row(
-          children: [
-            Expanded(
-              child: _AnimatedFeatureCard(
-                delay: 160,
-                icon: Icons.restaurant_rounded,
-                title: 'Recipes',
-                description: 'Find what to cook',
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF6B6B), Color(0xFFEE5A6F)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                onTap: () => Navigator.pushNamed(context, AppRoutes.recipes),
-                parentAnim: _gridCtrl,
-              ),
+        _GridRow(children: [
+          _AnimatedFeatureCard(
+            delay: 160,
+            icon: Icons.restaurant_rounded,
+            title: 'Recipes',
+            description: 'Find what to cook',
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFF6B6B), Color(0xFFEE5A6F)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: _AnimatedFeatureCard(
-                delay: 240,
-                icon: Icons.auto_graph_rounded,
-                title: 'Analytics',
-                description: 'Track nutrition',
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFFB800), Color(0xFFFFA000)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
-                parentAnim: _gridCtrl,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        // Row 3: Feedback — full width, shorter
-        _AnimatedFeatureCard(
-          delay: 320,
-          icon: Icons.feedback_rounded,
-          title: 'Send Feedback',
-          description: 'Help us improve PIATRA',
-          gradient: const LinearGradient(
-            colors: [Color(0xFFB24BF3), Color(0xFF9D3FDD)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            onTap: () => Navigator.pushNamed(context, AppRoutes.recipes),
+            parentAnim: _gridCtrl,
           ),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FeedbackFormScreen()),
-            );
-          },
-          parentAnim: _gridCtrl,
-          isWide: true,
-        ),
+          _AnimatedFeatureCard(
+            delay: 240,
+            icon: Icons.auto_graph_rounded,
+            title: 'Analytics',
+            description: 'Track nutrition',
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFFB800), Color(0xFFFFA000)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
+            parentAnim: _gridCtrl,
+          ),
+        ]),
+        const SizedBox(height: 14),
+        // Row 3: Feedback + Overview mini-stats
+        _GridRow(children: [
+          _AnimatedFeatureCard(
+            delay: 320,
+            icon: Icons.feedback_rounded,
+            title: 'Feedback',
+            description: 'Help us improve',
+            gradient: const LinearGradient(
+              colors: [Color(0xFFB24BF3), Color(0xFF9D3FDD)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            onTap: () => Navigator.pushNamed(context, AppRoutes.feedback),
+            parentAnim: _gridCtrl,
+          ),
+          _AnimatedOverviewCard(
+            delay: 400,
+            isDark: isDark,
+            parentAnim: _gridCtrl,
+          ),
+        ]),
       ],
     );
   }
+}
 
-  // ── Quick stats ────────────────────────────────────────────────────────────
+// ── Two-column row helper ──────────────────────────────────────────────────────
 
-  Widget _buildQuickStats(bool isDark) {
-    return FadeTransition(
-      opacity: _gridFade,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Overview',
-              style: TextStyle(
-                fontFamily: 'Sora',
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: isDark
-                    ? AppTheme.textPrimaryDark
-                    : AppTheme.textPrimaryLight,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.inventory_2_rounded,
-                    value: '23',
-                    label: 'In Pantry',
-                    color: AppTheme.primaryPurple,
-                    isDark: isDark,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.restaurant_menu_rounded,
-                    value: '12',
-                    label: 'Recipes Ready',
-                    color: AppTheme.secondaryTeal,
-                    isDark: isDark,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _StatCard(
-                    icon: Icons.local_fire_department_rounded,
-                    value: '1,840',
-                    label: 'kcal Today',
-                    color: AppTheme.accentOrange,
-                    isDark: isDark,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+class _GridRow extends StatelessWidget {
+  final List<Widget> children;
+  const _GridRow({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: children[0]),
+          const SizedBox(width: 14),
+          Expanded(child: children[1]),
+        ],
       ),
     );
   }
@@ -446,7 +396,6 @@ class _AmbientBackground extends StatelessWidget {
           ),
           child: Stack(
             children: [
-              // Purple orb top-right
               Positioned(
                 top: -60 + t * 20,
                 right: -80 + t * 15,
@@ -457,7 +406,6 @@ class _AmbientBackground extends StatelessWidget {
                       : AppTheme.primaryPurple.withOpacity(0.09),
                 ),
               ),
-              // Teal orb middle-left
               Positioned(
                 top: 260 + t * 30,
                 left: -100 + t * 10,
@@ -468,7 +416,6 @@ class _AmbientBackground extends StatelessWidget {
                       : AppTheme.secondaryTeal.withOpacity(0.07),
                 ),
               ),
-              // Orange orb bottom-right
               Positioned(
                 bottom: 100 - t * 20,
                 right: -60 + t * 8,
@@ -551,6 +498,9 @@ class _ModeBadge extends StatelessWidget {
 }
 
 // ── Animated feature card ─────────────────────────────────────────────────────
+//
+// Uses a plain InkWell for the tap handler — avoids the GestureDetector
+// onTap vs onTapUp race condition that was silently swallowing feedback taps.
 
 class _AnimatedFeatureCard extends StatefulWidget {
   final int delay;
@@ -560,7 +510,6 @@ class _AnimatedFeatureCard extends StatefulWidget {
   final Gradient gradient;
   final VoidCallback onTap;
   final AnimationController parentAnim;
-  final bool isWide;
 
   const _AnimatedFeatureCard({
     required this.delay,
@@ -570,7 +519,6 @@ class _AnimatedFeatureCard extends StatefulWidget {
     required this.gradient,
     required this.onTap,
     required this.parentAnim,
-    this.isWide = false,
   });
 
   @override
@@ -596,7 +544,6 @@ class _AnimatedFeatureCardState extends State<_AnimatedFeatureCard>
     );
     _pressAnim = _pressCtrl;
 
-    // Staggered entry: slide up + fade in
     final delayFrac = widget.delay / 1000.0;
     final begin = delayFrac.clamp(0.0, 0.8);
     final end = (begin + 0.4).clamp(0.0, 1.0);
@@ -629,166 +576,251 @@ class _AnimatedFeatureCardState extends State<_AnimatedFeatureCard>
       opacity: _fadeAnim,
       child: SlideTransition(
         position: _slideAnim,
-        child: GestureDetector(
-          onTapDown: (_) => _pressCtrl.reverse(),
-          onTapUp: (_) => _pressCtrl.forward(),
-          onTapCancel: () => _pressCtrl.forward(),
-          onTap: widget.onTap,
-          child: AnimatedBuilder(
-            animation: _pressAnim,
-            builder: (_, child) => Transform.scale(
-              scale: _pressAnim.value,
-              child: child,
-            ),
-            child: _buildCard(),
+        child: AnimatedBuilder(
+          animation: _pressAnim,
+          builder: (_, child) => Transform.scale(
+            scale: _pressAnim.value,
+            child: child,
           ),
+          child: _buildCard(),
         ),
       ),
     );
   }
 
   Widget _buildCard() {
-    final isWide = widget.isWide;
-    return Container(
-      height: isWide ? 80 : 148,
-      decoration: BoxDecoration(
-        gradient: widget.gradient,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.onTap,
+        onTapDown: (_) => _pressCtrl.reverse(),
+        onTapUp: (_) => _pressCtrl.forward(),
+        onTapCancel: () => _pressCtrl.forward(),
         borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: (widget.gradient as LinearGradient)
-                .colors
-                .first
-                .withOpacity(0.35),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: widget.gradient,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: (widget.gradient as LinearGradient)
+                    .colors
+                    .first
+                    .withOpacity(0.35),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: Stack(
-          children: [
-            // Subtle shimmer in top-right corner
-            Positioned(
-              top: -20,
-              right: -20,
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.08),
-                ),
-              ),
-            ),
-            Positioned(
-              top: -40,
-              right: -10,
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
-                ),
-              ),
-            ),
-            // Content
-            if (isWide)
-              // Wide layout: horizontal
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 22, vertical: 0),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(widget.icon, color: Colors.white, size: 22),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Stack(
+              children: [
+                // Shimmer circles
+                Positioned(
+                  top: -20,
+                  right: -20,
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.08),
                     ),
-                    const SizedBox(width: 16),
-                    Column(
+                  ),
+                ),
+                Positioned(
+                  top: -40,
+                  right: -10,
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.05),
+                    ),
+                  ),
+                ),
+                // Content — vertical layout, fixed height 148
+                SizedBox(
+                  height: 148,
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(widget.title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.2,
-                            )),
-                        Text(widget.description,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.75),
-                              fontSize: 12,
-                            )),
+                        Container(
+                          padding: const EdgeInsets.all(11),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(widget.icon,
+                              color: Colors.white, size: 26),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.description,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.75),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                    const Spacer(),
-                    Icon(Icons.arrow_forward_rounded,
-                        color: Colors.white.withOpacity(0.6), size: 20),
-                  ],
+                  ),
                 ),
-              )
-            else
-              // Tall layout: vertical
-              Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(11),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(widget.icon, color: Colors.white, size: 26),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.2,
-                            )),
-                        const SizedBox(height: 2),
-                        Text(widget.description,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.75),
-                              fontSize: 12,
-                            )),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-// ── Stat card ─────────────────────────────────────────────────────────────────
+// ── Overview mini-stats card (fills the 6th grid cell) ───────────────────────
 
-class _StatCard extends StatelessWidget {
+class _AnimatedOverviewCard extends StatefulWidget {
+  final int delay;
+  final bool isDark;
+  final AnimationController parentAnim;
+
+  const _AnimatedOverviewCard({
+    required this.delay,
+    required this.isDark,
+    required this.parentAnim,
+  });
+
+  @override
+  State<_AnimatedOverviewCard> createState() => _AnimatedOverviewCardState();
+}
+
+class _AnimatedOverviewCardState extends State<_AnimatedOverviewCard> {
+  late Animation<Offset> _slideAnim;
+  late Animation<double> _fadeAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    final delayFrac = widget.delay / 1000.0;
+    final begin = delayFrac.clamp(0.0, 0.8);
+    final end = (begin + 0.4).clamp(0.0, 1.0);
+
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.25),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: widget.parentAnim,
+      curve: Interval(begin, end, curve: Curves.easeOutCubic),
+    ));
+
+    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: widget.parentAnim,
+        curve: Interval(begin, end, curve: Curves.easeOut),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    return FadeTransition(
+      opacity: _fadeAnim,
+      child: SlideTransition(
+        position: _slideAnim,
+        child: Container(
+          height: 148,
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.cardDark : Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: isDark
+                  ? const Color(0x18FFFFFF)
+                  : const Color(0x10000000),
+            ),
+            boxShadow: isDark
+                ? []
+                : [
+                    BoxShadow(
+                      color: AppTheme.primaryPurple.withOpacity(0.06),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Overview',
+                  style: TextStyle(
+                    fontFamily: 'Sora',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppTheme.textPrimaryDark
+                        : AppTheme.textPrimaryLight,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                _MiniStatRow(
+                  icon: Icons.inventory_2_rounded,
+                  value: '23',
+                  label: 'Pantry',
+                  color: AppTheme.primaryPurple,
+                  isDark: isDark,
+                ),
+                _MiniStatRow(
+                  icon: Icons.restaurant_menu_rounded,
+                  value: '12',
+                  label: 'Recipes',
+                  color: AppTheme.secondaryTeal,
+                  isDark: isDark,
+                ),
+                _MiniStatRow(
+                  icon: Icons.local_fire_department_rounded,
+                  value: '1,840',
+                  label: 'kcal',
+                  color: AppTheme.accentOrange,
+                  isDark: isDark,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniStatRow extends StatelessWidget {
   final IconData icon;
   final String value;
   final String label;
   final Color color;
   final bool isDark;
 
-  const _StatCard({
+  const _MiniStatRow({
     required this.icon,
     required this.value,
     required this.label,
@@ -798,59 +830,41 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? const Color(0x18FFFFFF) : const Color(0x10000000),
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 15),
         ),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: color.withOpacity(0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 18),
+        const SizedBox(width: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontFamily: 'Sora',
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: isDark
+                ? AppTheme.textPrimaryDark
+                : AppTheme.textPrimaryLight,
+            letterSpacing: -0.3,
           ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'Sora',
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color:
-                  isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
-              letterSpacing: -0.5,
-            ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: isDark
+                ? AppTheme.textSecondaryDark
+                : AppTheme.textSecondaryLight,
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: isDark
-                  ? AppTheme.textSecondaryDark
-                  : AppTheme.textSecondaryLight,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
