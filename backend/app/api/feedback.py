@@ -13,15 +13,22 @@ class FeedbackRequest(BaseModel):
 
 @router.post("/")
 async def submit_feedback(request: FeedbackRequest):
-    """Receive feedback from the mobile app and send it via email."""
+    """Receive feedback from the mobile app and attempt to send it via email.
+
+    Email delivery is best-effort: if the SMTP credentials are missing or the
+    send fails for any reason we still return 200 so the client never sees a
+    server error just because email isn't configured on the host.
+    """
     if not request.feedback.strip():
         raise HTTPException(status_code=400, detail="Feedback cannot be empty.")
+
     try:
         send_feedback_email(request.feedback, request.user_id)
-        return {"message": "Feedback received. Thank you!"}
-    except ValueError as e:
-        # Missing env vars — still accept the feedback, just log the warning
-        print(f"[feedback] Email not configured: {e}")
-        return {"message": "Feedback received (email delivery not configured)."}
+        print(f"[feedback] Email sent OK (user={request.user_id})")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send feedback: {str(e)}")
+        # Log the problem but never surface it as a 500 to the client.
+        # Feedback is captured in server logs even when email is unavailable.
+        print(f"[feedback] Email delivery failed (non-fatal): {e}")
+        print(f"[feedback] Feedback content: {request.feedback[:200]}")
+
+    return {"message": "Feedback received. Thank you!"}
