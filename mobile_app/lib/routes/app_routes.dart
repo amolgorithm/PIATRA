@@ -1,3 +1,4 @@
+// lib/routes/app_routes.dart
 import 'package:flutter/material.dart';
 import '../ui/screens/home_screen.dart';
 import '../ui/screens/pantry_screen.dart';
@@ -7,6 +8,8 @@ import '../ui/screens/recipe_detail_screen.dart';
 import '../ui/screens/assistant_screen.dart';
 import '../ui/screens/profile_screen.dart';
 import '../ui/screens/feedback_form_screen.dart';
+import '../ui/screens/analytics_screen.dart';
+import '../ui/screens/meal_plan_screen.dart';
 import '../models/recipe.dart';
 
 class AppRoutes {
@@ -18,6 +21,8 @@ class AppRoutes {
   static const String assistant  = '/assistant';
   static const String profile    = '/profile';
   static const String feedback   = '/feedback';
+  static const String analytics  = '/analytics';
+  static const String mealPlan   = '/meal-plan';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -31,6 +36,8 @@ class AppRoutes {
       case assistant:    return MaterialPageRoute(builder: (_) => const AssistantScreen());
       case profile:      return MaterialPageRoute(builder: (_) => const ProfileScreen());
       case feedback:     return MaterialPageRoute(builder: (_) => FeedbackFormScreen());
+      case analytics:    return MaterialPageRoute(builder: (_) => const AnalyticsScreen());
+      case mealPlan:     return MaterialPageRoute(builder: (_) => const MealPlanScreen());
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(
@@ -40,4 +47,3 @@ class AppRoutes {
     }
   }
 }
-

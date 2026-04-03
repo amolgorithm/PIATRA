@@ -1,3 +1,7 @@
+// lib/ui/screens/home_screen.dart  (updated)
+// Changes: Analytics card → /analytics, new Meal Plan card → /meal-plan,
+// Feedback card remains. Grid is now 4 rows of 2.
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routes/app_routes.dart';
@@ -280,20 +284,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             onTap: () => Navigator.pushNamed(context, AppRoutes.recipes),
             parentAnim: _gridCtrl,
           ),
+          // ── UPDATED: Analytics card now navigates to /analytics ──
           _GlassFeatureCard(
             delay: 240,
             icon: Icons.auto_graph_rounded,
             title: 'Analytics',
-            description: 'Track nutrition',
+            description: 'Nutrition history',
             accentColor: const Color(0xFFFFB800),
-            onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
+            onTap: () => Navigator.pushNamed(context, AppRoutes.analytics),
             parentAnim: _gridCtrl,
           ),
         ]),
         const SizedBox(height: 14),
         _GridRow(children: [
+          // ── NEW: Meal Plan card ──
           _GlassFeatureCard(
             delay: 320,
+            icon: Icons.calendar_month_rounded,
+            title: 'Meal Plan',
+            description: 'Plan your week',
+            accentColor: const Color(0xFF4E9FF9),
+            onTap: () => Navigator.pushNamed(context, AppRoutes.mealPlan),
+            parentAnim: _gridCtrl,
+          ),
+          _GlassFeatureCard(
+            delay: 400,
             icon: Icons.feedback_rounded,
             title: 'Feedback',
             description: 'Help us improve',
@@ -301,14 +316,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             onTap: () => Navigator.pushNamed(context, AppRoutes.feedback),
             parentAnim: _gridCtrl,
           ),
-          _LiveOverviewCard(
-            delay: 400,
-            parentAnim: _gridCtrl,
-            pantryCount: _pantryCount,
-            recipesCount: _recipesCount,
-            overviewLoaded: _overviewLoaded,
-          ),
         ]),
+        const SizedBox(height: 14),
+        _LiveOverviewCard(
+          delay: 480,
+          parentAnim: _gridCtrl,
+          pantryCount: _pantryCount,
+          recipesCount: _recipesCount,
+          overviewLoaded: _overviewLoaded,
+        ),
       ],
     );
   }
@@ -438,7 +454,6 @@ class _GridRow extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Frosted-glass feature card
-// Increased opacity: card bg 0.22→0.38, border 0.45→0.65, icon pill bg 0.35→0.50
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _GlassFeatureCard extends StatefulWidget {
@@ -528,11 +543,9 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
               child: Container(
                 height: 148,
                 decoration: BoxDecoration(
-                  // ── INCREASED: card background opacity 0.22 → 0.38 ──
                   color: Colors.white.withOpacity(0.38),
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
-                    // ── INCREASED: border opacity 0.45 → 0.65 ──
                     color: Colors.white.withOpacity(0.65),
                     width: 1,
                   ),
@@ -574,17 +587,15 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                // ── INCREASED: icon pill bg opacity 0.35 → 0.50 ──
                                 color: widget.accentColor.withOpacity(0.50),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  // ── INCREASED: icon pill border opacity 0.55 → 0.75 ──
                                   color: widget.accentColor.withOpacity(0.75),
                                   width: 1,
                                 ),
                               ),
-                              child:
-                                  Icon(widget.icon, color: Colors.white, size: 24),
+                              child: Icon(widget.icon,
+                                  color: Colors.white, size: 24),
                             ),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -602,7 +613,6 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
                                 Text(
                                   widget.description,
                                   style: TextStyle(
-                                    // ── INCREASED: description text opacity 0.75 → 0.90 ──
                                     color: Colors.white.withOpacity(0.90),
                                     fontSize: 11,
                                   ),
@@ -625,7 +635,7 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Live Overview Card — matched opacity increases
+// Live Overview Card — full-width now
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _LiveOverviewCard extends StatefulWidget {
@@ -683,63 +693,72 @@ class _LiveOverviewCardState extends State<_LiveOverviewCard> {
             final mode = up.profile?.cookingMode;
 
             return Container(
-              height: 148,
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               decoration: BoxDecoration(
-                // ── INCREASED: overview card bg opacity 0.22 → 0.38 ──
                 color: Colors.white.withOpacity(0.38),
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  // ── INCREASED: border opacity 0.45 → 0.65 ──
                   color: Colors.white.withOpacity(0.65),
                   width: 1,
                 ),
               ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Overview',
-                          style: TextStyle(
-                            fontFamily: 'Sora',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: -0.1,
-                          ),
+                        Row(
+                          children: [
+                            const Text(
+                              'Overview',
+                              style: TextStyle(
+                                fontFamily: 'Sora',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const Spacer(),
+                            if (mode != null)
+                              Text(mode.emoji,
+                                  style: const TextStyle(fontSize: 16)),
+                          ],
                         ),
-                        const Spacer(),
-                        if (mode != null)
-                          Text(
-                            mode.emoji,
-                            style: const TextStyle(fontSize: 14),
-                          ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _LiveStatRow(
+                              icon: Icons.inventory_2_rounded,
+                              value: widget.overviewLoaded
+                                  ? '${widget.pantryCount}'
+                                  : '—',
+                              label: 'Pantry',
+                              color: AppTheme.primaryPurple,
+                            ),
+                            const SizedBox(width: 20),
+                            _LiveStatRow(
+                              icon: Icons.restaurant_menu_rounded,
+                              value: widget.overviewLoaded
+                                  ? '${widget.recipesCount}'
+                                  : '—',
+                              label: 'Recipes',
+                              color: AppTheme.secondaryTeal,
+                            ),
+                            const SizedBox(width: 20),
+                            _LiveStatRow(
+                              icon: Icons.local_fire_department_rounded,
+                              value: _formatCalories(calTarget),
+                              label: 'kcal target',
+                              color: AppTheme.accentOrange,
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                    _LiveStatRow(
-                      icon: Icons.inventory_2_rounded,
-                      value: widget.overviewLoaded ? '${widget.pantryCount}' : '—',
-                      label: 'Pantry items',
-                      color: AppTheme.primaryPurple,
-                    ),
-                    _LiveStatRow(
-                      icon: Icons.restaurant_menu_rounded,
-                      value: widget.overviewLoaded ? '${widget.recipesCount}' : '—',
-                      label: 'Recipes found',
-                      color: AppTheme.secondaryTeal,
-                    ),
-                    _LiveStatRow(
-                      icon: Icons.local_fire_department_rounded,
-                      value: _formatCalories(calTarget),
-                      label: 'kcal target',
-                      color: AppTheme.accentOrange,
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             );
           },
@@ -781,27 +800,31 @@ class _LiveStatRow extends StatelessWidget {
           child: Icon(icon, color: color, size: 14),
         ),
         const SizedBox(width: 8),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 400),
-          child: Text(
-            value,
-            key: ValueKey(value),
-            style: const TextStyle(
-              fontFamily: 'Sora',
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: -0.3,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              child: Text(
+                value,
+                key: ValueKey(value),
+                style: const TextStyle(
+                  fontFamily: 'Sora',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -0.3,
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.white.withOpacity(0.60),
-          ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.white.withOpacity(0.60),
+              ),
+            ),
+          ],
         ),
       ],
     );

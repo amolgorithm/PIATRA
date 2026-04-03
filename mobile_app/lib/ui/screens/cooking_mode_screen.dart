@@ -17,6 +17,8 @@ import '../../services/spoonacular_service.dart';
 import '../../services/recipe_ranking_engine.dart';
 import '../../state/user_provider.dart';
 import '../../core/config/app_config.dart';
+import '../../services/nutrition_history_service.dart';
+import '../../services/recipe_history_service.dart';
 
 class CookingModeScreen extends StatefulWidget {
   final RankedRecipe ranked;
@@ -158,10 +160,42 @@ class _CookingModeScreenState extends State<CookingModeScreen>
 
   void _nextStep() {
     if (_isLastStep) {
+      _logCompletion();
       setState(() => _completed = true);
     } else {
       _goToStep(_currentStep + 1);
-      _aiStepHint(_currentStep); // proactive AI hint for new step
+      _aiStepHint(_currentStep);
+    }
+  }
+ 
+  Future<void> _logCompletion() async {
+    final r = widget.ranked.recipe;
+    try {
+      // Log to nutrition history
+      await NutritionHistoryService.instance.logMeal(
+        recipeId:     r.id,
+        recipeTitle:  r.title,
+        recipeImage:  r.image,
+        calories:     r.nutrition.calories,
+        protein:      r.nutrition.protein,
+        carbs:        r.nutrition.carbs,
+        fat:          r.nutrition.fat,
+        fiber:        r.nutrition.fiber,
+        sodium:       r.nutrition.sodium,
+        servings:     r.servings,
+        cuisines:     r.cuisines,
+        tags:         [
+          if (r.vegan)        'vegan',
+          if (r.vegetarian)   'vegetarian',
+          if (r.glutenFree)   'glutenFree',
+          if (r.dairyFree)    'dairyFree',
+          if (r.veryHealthy)  'veryHealthy',
+        ],
+      );
+      // Log to recipe history (cook count)
+      await RecipeHistoryService.instance.recordCook(r);
+    } catch (e) {
+      debugPrint('[CookingMode] Failed to log completion: $e');
     }
   }
 
@@ -1045,7 +1079,7 @@ class _CookingModeScreenState extends State<CookingModeScreen>
 class _CompletionScreen extends StatelessWidget {
   final SpoonacularRecipe recipe;
   const _CompletionScreen({required this.recipe});
-
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1076,29 +1110,76 @@ class _CompletionScreen extends StatelessWidget {
                         color: Colors.white,
                         fontWeight: FontWeight.w500),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${recipe.nutrition.calories.round()} kcal  •  '
-                    '${recipe.nutrition.protein.toStringAsFixed(1)}g protein',
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(0.85), fontSize: 15),
-                  ),
-                  const SizedBox(height: 48),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context)
-                        ..pop() // cooking mode
-                        ..pop(); // detail screen
-                    },
-                    icon: const Icon(Icons.home_rounded),
-                    label: const Text('Back to Recipes'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppTheme.successGreen,
-                      minimumSize: const Size(220, 52),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)),
+                  const SizedBox(height: 20),
+                  // Nutrition summary card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(18),
                     ),
+                    child: Column(
+                      children: [
+                        const Text('Logged to Nutrition History ✓',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _NutStat('${recipe.nutrition.calories.round()}', 'kcal'),
+                            _NutStat('${recipe.nutrition.protein.toStringAsFixed(1)}g', 'protein'),
+                            _NutStat('${recipe.nutrition.carbs.toStringAsFixed(1)}g', 'carbs'),
+                            _NutStat('${recipe.nutrition.fat.toStringAsFixed(1)}g', 'fat'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context)
+                            ..pop()
+                            ..pop(),
+                          icon: const Icon(Icons.home_rounded,
+                              color: Colors.white),
+                          label: const Text('Home',
+                              style: TextStyle(color: Colors.white)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.white54),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => Navigator.of(context)
+                            ..pop()
+                            ..pop()
+                            ..pushNamed('/analytics'),
+                          icon: const Icon(Icons.bar_chart_rounded),
+                          label: const Text('Analytics'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: AppTheme.successGreen,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1108,6 +1189,26 @@ class _CompletionScreen extends StatelessWidget {
       ),
     );
   }
+}
+ 
+class _NutStat extends StatelessWidget {
+  final String value;
+  final String label;
+  const _NutStat(this.value, this.label);
+ 
+  @override
+  Widget build(BuildContext context) => Column(
+        children: [
+          Text(value,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16)),
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white70, fontSize: 11)),
+        ],
+      );
 }
 
 // ─── Helper widgets ───────────────────────────────────────────────────────────
