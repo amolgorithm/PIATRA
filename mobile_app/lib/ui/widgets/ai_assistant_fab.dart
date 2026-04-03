@@ -117,6 +117,10 @@ class _AIAssistantFABState extends State<AIAssistantFAB>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Respect the system nav bar so FABs are never hidden behind it.
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final fabBottom = bottomInset + 16.0;
+
     return Stack(
       alignment: Alignment.bottomRight,
       children: [
@@ -128,9 +132,9 @@ class _AIAssistantFABState extends State<AIAssistantFAB>
             child: Container(color: Colors.black.withOpacity(0.40)),
           ),
 
-        // Floating panel — clears the 62px FAB (20 bottom + 62 height + 8 gap)
+        // Floating panel — sits above the FAB with a fixed gap
         Positioned(
-          bottom: 92,
+          bottom: fabBottom + 72, // FAB height (62) + 10px gap
           right: 16,
           child: FadeTransition(
             opacity: _expandFade,
@@ -145,9 +149,9 @@ class _AIAssistantFABState extends State<AIAssistantFAB>
           ),
         ),
 
-        // FAB — bottom:20 right:20, same row as ThemeToggleFAB
+        // FAB
         Positioned(
-          bottom: 20,
+          bottom: fabBottom,
           right: 20,
           child: _buildFAB(isDark),
         ),

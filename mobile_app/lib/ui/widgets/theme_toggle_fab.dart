@@ -55,13 +55,16 @@ class _ThemeToggleFABState extends State<ThemeToggleFAB>
 
   @override
   Widget build(BuildContext context) {
+    // Respect the system nav bar height so the FAB is never hidden behind it.
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    final fabBottom = bottomInset + 16.0;
+
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         final isDark = themeProvider.isDarkMode;
 
-        // ── FIX: bottom:20 matches the AI assistant FAB height exactly ──
         return Positioned(
-          bottom: 20,
+          bottom: fabBottom,
           left: 20,
           child: GestureDetector(
             onTap: () {

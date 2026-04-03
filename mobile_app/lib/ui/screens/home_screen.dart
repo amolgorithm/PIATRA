@@ -438,10 +438,7 @@ class _GridRow extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Frosted-glass feature card
-// card bg:    0.10 → 0.22  (much more visible body)
-// card border: 0.22 → 0.45  (clear, defined edge)
-// icon pill:  0.25 → 0.35, border 0.4 → 0.55
-// description text: 0.65 → 0.75
+// Increased opacity: card bg 0.22→0.38, border 0.45→0.65, icon pill bg 0.35→0.50
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _GlassFeatureCard extends StatefulWidget {
@@ -531,10 +528,12 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
               child: Container(
                 height: 148,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.22),
+                  // ── INCREASED: card background opacity 0.22 → 0.38 ──
+                  color: Colors.white.withOpacity(0.38),
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.45),
+                    // ── INCREASED: border opacity 0.45 → 0.65 ──
+                    color: Colors.white.withOpacity(0.65),
                     width: 1,
                   ),
                   boxShadow: [
@@ -559,7 +558,7 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
                             shape: BoxShape.circle,
                             gradient: RadialGradient(
                               colors: [
-                                widget.accentColor.withOpacity(0.40),
+                                widget.accentColor.withOpacity(0.50),
                                 Colors.transparent,
                               ],
                             ),
@@ -575,10 +574,12 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: widget.accentColor.withOpacity(0.35),
+                                // ── INCREASED: icon pill bg opacity 0.35 → 0.50 ──
+                                color: widget.accentColor.withOpacity(0.50),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: widget.accentColor.withOpacity(0.55),
+                                  // ── INCREASED: icon pill border opacity 0.55 → 0.75 ──
+                                  color: widget.accentColor.withOpacity(0.75),
                                   width: 1,
                                 ),
                               ),
@@ -601,7 +602,8 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
                                 Text(
                                   widget.description,
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.75),
+                                    // ── INCREASED: description text opacity 0.75 → 0.90 ──
+                                    color: Colors.white.withOpacity(0.90),
                                     fontSize: 11,
                                   ),
                                 ),
@@ -623,7 +625,7 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Live Overview Card — matched opacity to feature cards
+// Live Overview Card — matched opacity increases
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _LiveOverviewCard extends StatefulWidget {
@@ -683,10 +685,12 @@ class _LiveOverviewCardState extends State<_LiveOverviewCard> {
             return Container(
               height: 148,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.22),
+                // ── INCREASED: overview card bg opacity 0.22 → 0.38 ──
+                color: Colors.white.withOpacity(0.38),
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.45),
+                  // ── INCREASED: border opacity 0.45 → 0.65 ──
+                  color: Colors.white.withOpacity(0.65),
                   width: 1,
                 ),
               ),
