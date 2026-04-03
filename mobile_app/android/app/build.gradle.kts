@@ -5,6 +5,9 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import java.io.FileInputStream
+import java.util.Properties
+
 android {
     namespace = "com.example.piatra"
     compileSdk = flutter.compileSdkVersion
@@ -15,8 +18,25 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
+    }
+
+    val keystoreProperties = Properties()
+    val keystorePropertiesFile = rootProject.file("../key.properties")
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    }
+
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties.getProperty("keyAlias", "piatra_key")
+            keyPassword = keystoreProperties.getProperty("keyPassword", "piatraApp12367")
+            storeFile = file(keystoreProperties.getProperty("storeFile", "piatra_release.keystore"))
+            storePassword = keystoreProperties.getProperty("storePassword", "piatraApp12367")
+        }
     }
 
     defaultConfig {
@@ -32,9 +52,10 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+            isShrinkResources = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
