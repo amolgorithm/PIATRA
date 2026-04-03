@@ -119,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                const SliverToBoxAdapter(child: SizedBox(height: 110)),
+                const SliverToBoxAdapter(child: SizedBox(height: 240)),
               ],
             ),
           ),
@@ -543,10 +543,10 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
               child: Container(
                 height: 148,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.38),
+                  color: widget.accentColor.withOpacity(0.48),
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.65),
+                    color: widget.accentColor.withOpacity(0.65),
                     width: 1,
                   ),
                   boxShadow: [
@@ -694,14 +694,14 @@ class _LiveOverviewCardState extends State<_LiveOverviewCard> {
 
             return Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.38),
+                color: AppTheme.primaryPurple.withOpacity(0.48),
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.65),
+                  color: AppTheme.primaryPurple.withOpacity(0.65),
                   width: 1,
-                ),
+                )
               ),
               child: Row(
                 children: [
@@ -723,7 +723,7 @@ class _LiveOverviewCardState extends State<_LiveOverviewCard> {
                             const Spacer(),
                             if (mode != null)
                               Text(mode.emoji,
-                                  style: const TextStyle(fontSize: 16)),
+                                  style: const TextStyle(fontSize: 10)),
                           ],
                         ),
                         const SizedBox(height: 12),

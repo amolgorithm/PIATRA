@@ -120,6 +120,7 @@ class _AIAssistantFABState extends State<AIAssistantFAB>
     // Respect the system nav bar so FABs are never hidden behind it.
     final bottomInset = MediaQuery.of(context).padding.bottom;
     final fabBottom = bottomInset + 16.0;
+    final alignedBottom = fabBottom - 13.0; // match ThemeToggleFAB baseline (52 popup vs 78 outer size)
 
     return Stack(
       alignment: Alignment.bottomRight,
@@ -151,7 +152,7 @@ class _AIAssistantFABState extends State<AIAssistantFAB>
 
         // FAB
         Positioned(
-          bottom: fabBottom,
+          bottom: alignedBottom,
           right: 20,
           child: _buildFAB(isDark),
         ),
