@@ -1,17 +1,26 @@
 // lib/ui/widgets/soda_background_painter.dart
 //
-// Cinematic, physically-based soda pour simulation.
-// Light mode: golden amber cola pour (Coca-Cola / craft soda aesthetic)
-// Dark mode:  deep indigo/violet dark cola pour (night-bar aesthetic)
+// Realistic soda pour background.
 //
-// Technique:
-//  • Multiple metaball "blobs" that merge into a realistic fluid body
-//  • Layered Perlin-style noise for surface shimmer / caustics
-//  • Volumetric bubble columns rising with turbulence
-//  • Pour stream from top with taper + oscillation
-//  • Foam collar at the liquid surface (layered alpha circles)
-//  • Carbonation sparkle layer (tiny bright flecks)
-//  • All driven by a single [animation] value (0→1 repeating)
+// LIGHT MODE:
+//   - Pale cream/off-white background (like looking at a glass from outside)
+//   - Amber/caramel soda liquid visible through the glass — warm, translucent
+//   - Light glinting through gives bright golden highlights
+//   - The "glass" effect: bright background with warm amber liquid tones
+//
+// DARK MODE:
+//   - Deep dark background (night bar / dimly lit scene)
+//   - Rich amber/brown cola clearly visible
+//   - Bubbles and foam catch what little light there is
+//   - More dramatic contrast
+//
+// GPU budget:
+//   - No per-pixel shader math (no fbm, no multi-octave noise in inner loops)
+//   - Simple sine waves for surface + bubbles
+//   - ~60 bubble dots max, drawn as simple circles
+//   - ~8 foam blobs, ~12 caustic ellipses
+//   - One pour stream path
+//   - repaint only when t changes (driven by external AnimationController)
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -33,9 +42,10 @@ class _SodaBackgroundState extends State<SodaBackground>
   @override
   void initState() {
     super.initState();
+    // 16s cycle — smooth, not frenetic
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 12),
+      duration: const Duration(seconds: 16),
     )..repeat();
   }
 
@@ -60,528 +70,419 @@ class _SodaBackgroundState extends State<SodaBackground>
 // ── Painter ───────────────────────────────────────────────────────────────────
 
 class _SodaPainter extends CustomPainter {
-  final double t; // 0..1 animation progress
+  final double t;   // 0..1
   final bool isDark;
 
   _SodaPainter({required this.t, required this.isDark});
 
-  // ── Palette ────────────────────────────────────────────────────────────────
+  // ── Light mode palette: backlit glass of cola ──────────────────────────────
+  // Background = very light cream, liquid = warm amber seen through glass
+  static const Color _lBg1        = Color(0xFFFBF7F0); // top — cream white
+  static const Color _lBg2        = Color(0xFFF5EDD8); // bottom — warm cream
+  static const Color _lLiquidTop  = Color(0xFFE8A84A); // amber surface, backlit
+  static const Color _lLiquidMid  = Color(0xFFB86820); // mid amber
+  static const Color _lLiquidDeep = Color(0xFF7A3A0A); // deep cola brown
+  static const Color _lGlare      = Color(0xFFFFF5E0); // light glare through glass
+  static const Color _lFoam       = Color(0xFFFFF0C8); // cream foam
+  static const Color _lBubble     = Color(0xFFE8A84A); // amber bubble rings
+  static const Color _lStream     = Color(0xFFD4861C); // pour stream
 
-  // Light: rich amber cola
-  static const _lightLiquidDeep   = Color(0xFFB05A0A);
-  static const _lightLiquidMid    = Color(0xFFD4770F);
-  static const _lightLiquidBright = Color(0xFFF5A623);
-  static const _lightFoam         = Color(0xFFFFF3DC);
-  static const _lightBubble       = Color(0xFFFFD580);
-  static const _lightSparkle      = Color(0xFFFFFFFF);
-  static const _lightBg           = Color(0xFF5C2A00);
+  // ── Dark mode palette: dimly lit bar, glass of cola ───────────────────────
+  static const Color _dBg1        = Color(0xFF0A0806); // near black warm
+  static const Color _dBg2        = Color(0xFF150E06); // very dark brown-black
+  static const Color _dLiquidTop  = Color(0xFF7A3A0A); // dark amber surface
+  static const Color _dLiquidMid  = Color(0xFF4A2005); // deep brown mid
+  static const Color _dLiquidDeep = Color(0xFF1A0A02); // almost black cola bottom
+  static const Color _dGlare      = Color(0xFFD4861C); // amber highlight rim
+  static const Color _dFoam       = Color(0xFF8B5C1A); // dark foam
+  static const Color _dBubble     = Color(0xFFA06828); // dim amber bubbles
+  static const Color _dStream     = Color(0xFFB07030); // pour stream
 
-  // Dark: deep indigo / violet dark soda
-  static const _darkLiquidDeep    = Color(0xFF0A0820);
-  static const _darkLiquidMid     = Color(0xFF1A1040);
-  static const _darkLiquidBright  = Color(0xFF3D1F8C);
-  static const _darkFoam          = Color(0xFF6B4FCC);
-  static const _darkBubble        = Color(0xFF9B79FF);
-  static const _darkSparkle       = Color(0xFFD4BBFF);
-  static const _darkBg            = Color(0xFF05040F);
-
-  Color get _deep   => isDark ? _darkLiquidDeep   : _lightLiquidDeep;
-  Color get _mid    => isDark ? _darkLiquidMid    : _lightLiquidMid;
-  Color get _bright => isDark ? _darkLiquidBright : _lightLiquidBright;
-  Color get _foam   => isDark ? _darkFoam         : _lightFoam;
-  Color get _bubble => isDark ? _darkBubble       : _lightBubble;
-  Color get _spark  => isDark ? _darkSparkle      : _lightSparkle;
-  Color get _bg     => isDark ? _darkBg           : _lightBg;
-
-  // ── Math helpers ───────────────────────────────────────────────────────────
-
-  double _sin(double x) => math.sin(x);
-  double _cos(double x) => math.cos(x);
-  double _frac(double x) => x - x.floorToDouble();
-
-  // Simple hash-noise (deterministic pseudo-random)
-  double _hash(double x, double y) {
-    final v = _sin(x * 127.1 + y * 311.7) * 43758.5453;
-    return v - v.floorToDouble();
-  }
-
-  // Smooth value noise
-  double _noise(double x, double y) {
-    final ix = x.floorToDouble();
-    final iy = y.floorToDouble();
-    final fx = _frac(x);
-    final fy = _frac(y);
-    final ux = fx * fx * (3 - 2 * fx);
-    final uy = fy * fy * (3 - 2 * fy);
-    final a = _hash(ix,     iy    );
-    final b = _hash(ix+1.0, iy    );
-    final c = _hash(ix,     iy+1.0);
-    final d = _hash(ix+1.0, iy+1.0);
-    return a + (b-a)*ux + (c-a)*uy + (d-c+a-b)*ux*uy;
-  }
-
-  // Fractional Brownian Motion — stacks noise octaves for realistic texture
-  double _fbm(double x, double y, int octaves) {
-    double v = 0, amp = 0.5, freq = 1.0, maxV = 0;
-    for (int i = 0; i < octaves; i++) {
-      v    += _noise(x * freq, y * freq) * amp;
-      maxV += amp;
-      amp  *= 0.5;
-      freq *= 2.0;
-    }
-    return v / maxV;
-  }
-
-  // ── Draw ───────────────────────────────────────────────────────────────────
+  Color get bg1        => isDark ? _dBg1        : _lBg1;
+  Color get bg2        => isDark ? _dBg2        : _lBg2;
+  Color get liquidTop  => isDark ? _dLiquidTop  : _lLiquidTop;
+  Color get liquidMid  => isDark ? _dLiquidMid  : _lLiquidMid;
+  Color get liquidDeep => isDark ? _dLiquidDeep : _lLiquidDeep;
+  Color get glareColor => isDark ? _dGlare      : _lGlare;
+  Color get foamColor  => isDark ? _dFoam       : _lFoam;
+  Color get bubbleColor=> isDark ? _dBubble     : _lBubble;
+  Color get streamColor=> isDark ? _dStream     : _lStream;
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
     final pi2 = math.pi * 2;
+    final slow = t * pi2;
+    final med  = t * pi2 * 2.5;
 
-    // --- 1. Background fill -------------------------------------------------
-    final bgPaint = Paint()
+    // 1. Background gradient
+    _paintBackground(canvas, w, h);
+
+    // 2. Liquid body — fills lower ~62% of screen
+    final surfaceY = h * 0.40;
+    final surface  = _buildSurface(w, h, surfaceY, slow, med);
+    _paintLiquid(canvas, w, h, surface);
+
+    // 3. Light glare through liquid (light mode: strong; dark mode: subtle rim)
+    _paintGlare(canvas, w, h, surface);
+
+    // 4. Rising bubbles (cheap — just circles)
+    _paintBubbles(canvas, w, h, surface, slow, med);
+
+    // 5. Pour stream from top
+    _paintPourStream(canvas, w, h, surface, slow, med);
+
+    // 6. Foam at surface
+    _paintFoam(canvas, w, h, surface, slow);
+
+    // 7. Top vignette to blend into UI
+    _paintTopFade(canvas, w, h);
+  }
+
+  // ── Background ─────────────────────────────────────────────────────────────
+
+  void _paintBackground(Canvas canvas, double w, double h) {
+    final paint = Paint()
       ..shader = LinearGradient(
-        colors: [_bg, _deep],
+        colors: [bg1, bg2],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
       ).createShader(Rect.fromLTWH(0, 0, w, h));
-    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), bgPaint);
-
-    // Animated time scalars
-    final slow  = t * pi2;
-    final med   = t * pi2 * 2.3;
-    final fast  = t * pi2 * 4.7;
-
-    // ── 2. Liquid body (large fluid mass) -----------------------------------
-    // The liquid fills the lower ~65% of the screen with a wavy top surface.
-
-    final liquidTop = h * 0.38; // base surface height
-    final surfaceWave = _buildSurface(w, h, liquidTop, slow, med);
-    _drawLiquidBody(canvas, size, surfaceWave, liquidTop);
-
-    // ── 3. Caustic / shimmer layer inside liquid ----------------------------
-    _drawCaustics(canvas, size, surfaceWave, slow, med, fast);
-
-    // ── 4. Rising bubble columns --------------------------------------------
-    _drawBubbleColumns(canvas, size, surfaceWave, slow, fast);
-
-    // ── 5. Pour stream from top ---------------------------------------------
-    _drawPourStream(canvas, size, slow, med);
-
-    // ── 6. Foam collar at liquid surface ------------------------------------
-    _drawFoamCollar(canvas, size, surfaceWave);
-
-    // ── 7. Carbonation sparkles (surface) -----------------------------------
-    _drawSparkles(canvas, size, surfaceWave, fast);
-
-    // ── 8. Vignette overlay -------------------------------------------------
-    final vigPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [Colors.transparent, _bg.withOpacity(0.7)],
-        radius: 0.85,
-      ).createShader(Rect.fromLTWH(0, 0, w, h));
-    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), vigPaint);
-
-    // ── 9. Light caustic overlay (top bright reflection) -------------------
-    if (!isDark) {
-      final topGlow = Paint()
-        ..shader = LinearGradient(
-          colors: [
-            const Color(0xFFFFE08A).withOpacity(0.18),
-            Colors.transparent,
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.center,
-        ).createShader(Rect.fromLTWH(0, 0, w, h * 0.5));
-      canvas.drawRect(Rect.fromLTWH(0, 0, w, h * 0.5), topGlow);
-    } else {
-      // dark: deep purple glow from bottom
-      final botGlow = Paint()
-        ..shader = LinearGradient(
-          colors: [
-            Colors.transparent,
-            const Color(0xFF6B2FCC).withOpacity(0.12),
-          ],
-          begin: Alignment.center,
-          end: Alignment.bottomCenter,
-        ).createShader(Rect.fromLTWH(0, h * 0.5, w, h * 0.5));
-      canvas.drawRect(Rect.fromLTWH(0, h * 0.5, w, h * 0.5), botGlow);
-    }
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h), paint);
   }
 
-  // ── Surface path ──────────────────────────────────────────────────────────
+  // ── Surface path ───────────────────────────────────────────────────────────
 
-  List<double> _buildSurface(double w, double h, double base,
-      double slow, double med) {
-    final steps = 80;
-    final pts = <double>[];
+  List<double> _buildSurface(double w, double h, double base, double slow, double med) {
+    const steps = 60;
+    final pts = List<double>.filled(steps + 1, 0);
     for (int i = 0; i <= steps; i++) {
       final nx = i / steps;
-      // Layered waves: long swell + ripple + micro
-      final swell  = _sin(nx * math.pi * 1.8 + slow)       * h * 0.025;
-      final ripple = _sin(nx * math.pi * 4.3 - med * 0.7)  * h * 0.012;
-      final micro  = _sin(nx * math.pi * 9.1 + slow * 1.3) * h * 0.006;
-      // fbm turbulence
-      final fbmV   = _fbm(nx * 3.0 + slow * 0.1, slow * 0.05, 3) - 0.5;
-      pts.add(base + swell + ripple + micro + fbmV * h * 0.018);
+      // Two simple overlapping sine waves — cheap and good-looking
+      final wave1 = math.sin(nx * math.pi * 2.2 + slow)       * h * 0.022;
+      final wave2 = math.sin(nx * math.pi * 4.8 - med * 0.55) * h * 0.010;
+      pts[i] = base + wave1 + wave2;
     }
     return pts;
   }
 
-  // ── Liquid body ───────────────────────────────────────────────────────────
+  // ── Liquid body ────────────────────────────────────────────────────────────
 
-  void _drawLiquidBody(Canvas canvas, Size size, List<double> surface,
-      double liquidTop) {
-    final w = size.width;
-    final h = size.height;
+  void _paintLiquid(Canvas canvas, double w, double h, List<double> surface) {
     final steps = surface.length - 1;
-
     final path = Path();
     path.moveTo(0, surface[0]);
+
     for (int i = 1; i <= steps; i++) {
+      // Smooth cubic bezier segments
       final x0 = (i - 1) / steps * w;
       final x1 = i / steps * w;
       final y0 = surface[i - 1];
       final y1 = surface[i];
-      // Cubic bezier for smooth wave
-      path.cubicTo(x0 + (x1-x0)*0.4, y0, x0 + (x1-x0)*0.6, y1, x1, y1);
+      path.cubicTo(
+        x0 + (x1 - x0) * 0.45, y0,
+        x0 + (x1 - x0) * 0.55, y1,
+        x1, y1,
+      );
     }
     path.lineTo(w, h);
     path.lineTo(0, h);
     path.close();
 
-    // Main liquid gradient — deep to bright bottom-to-surface
+    // Main liquid gradient — surface is brightest (backlit), deep is darkest
     final paint = Paint()
       ..shader = LinearGradient(
-        colors: [_deep, _mid, _bright.withOpacity(0.85)],
+        colors: [liquidDeep, liquidMid, liquidTop],
         begin: Alignment.bottomCenter,
         end: Alignment.topCenter,
-        stops: const [0.0, 0.55, 1.0],
+        stops: const [0.0, 0.45, 1.0],
       ).createShader(Rect.fromLTWH(0, 0, w, h));
     canvas.drawPath(path, paint);
 
-    // Inner light refraction — diagonal highlight
-    final refractPaint = Paint()
-      ..shader = LinearGradient(
-        colors: [
-          _bright.withOpacity(0.22),
-          Colors.transparent,
-          _bright.withOpacity(0.08),
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        stops: const [0.0, 0.5, 1.0],
-      ).createShader(Rect.fromLTWH(0, liquidTop, w, h - liquidTop));
-    canvas.drawPath(path, refractPaint);
-  }
-
-  // ── Caustics ──────────────────────────────────────────────────────────────
-
-  void _drawCaustics(Canvas canvas, Size size, List<double> surface,
-      double slow, double med, double fast) {
-    final w = size.width;
-    final h = size.height;
-    final rng = math.Random(42);
-
-    // Draw ~14 caustic blobs
-    for (int i = 0; i < 14; i++) {
-      final bx = rng.nextDouble() * w;
-      final by = rng.nextDouble() * h * 0.5 + h * 0.4;
-      // Animate position
-      final ax = _sin(slow * 0.7 + i * 2.3) * w * 0.08;
-      final ay = _sin(med  * 0.5 + i * 1.7) * h * 0.04;
-      final cx = bx + ax;
-      final cy = by + ay;
-
-      // Size pulse
-      final r = (20 + _sin(fast * 0.3 + i) * 8) * (w / 400);
-      final opacity = 0.04 + _sin(slow + i * 0.9).abs() * 0.06;
-
-      final paint = Paint()
-        ..shader = RadialGradient(
+    // In light mode, add a secondary horizontal shimmer
+    // (light passing through the glass sideways)
+    if (!isDark) {
+      final shimmerPaint = Paint()
+        ..shader = LinearGradient(
           colors: [
-            _bright.withOpacity(opacity),
-            Colors.transparent,
+            _lGlare.withOpacity(0.0),
+            _lGlare.withOpacity(0.18),
+            _lGlare.withOpacity(0.0),
           ],
-        ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r));
-      canvas.drawCircle(Offset(cx, cy), r, paint);
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          stops: const [0.0, 0.5, 1.0],
+        ).createShader(Rect.fromLTWH(0, 0, w, h));
+      canvas.drawPath(path, shimmerPaint);
     }
   }
 
-  // ── Bubble columns ────────────────────────────────────────────────────────
+  // ── Glare ──────────────────────────────────────────────────────────────────
 
-  void _drawBubbleColumns(Canvas canvas, Size size, List<double> surface,
-      double slow, double fast) {
-    final w = size.width;
-    final h = size.height;
-    // 7 independent bubble columns
-    const cols = 7;
-    final seededRng = math.Random(77);
+  void _paintGlare(Canvas canvas, double w, double h, List<double> surface) {
+    // Light mode: bright band near surface = light passing through liquid top
+    // Dark mode: just a thin bright edge line on the surface itself
+    final surfYAvg = surface.fold(0.0, (a, b) => a + b) / surface.length;
+
+    if (!isDark) {
+      // Soft bright band just below surface — like backlit amber
+      final paint = Paint()
+        ..shader = LinearGradient(
+          colors: [
+            glareColor.withOpacity(0.50),
+            glareColor.withOpacity(0.10),
+            Colors.transparent,
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ).createShader(Rect.fromLTWH(0, surfYAvg, w, h * 0.18));
+      // Clip to liquid area only
+      canvas.save();
+      final clipPath = Path()
+        ..moveTo(0, surfYAvg - 20)
+        ..lineTo(w, surfYAvg - 20)
+        ..lineTo(w, h)
+        ..lineTo(0, h)
+        ..close();
+      canvas.clipPath(clipPath);
+      canvas.drawRect(Rect.fromLTWH(0, surfYAvg, w, h * 0.18), paint);
+      canvas.restore();
+    } else {
+      // Dark mode: thin amber rim highlight along the surface
+      final steps = surface.length - 1;
+      final rimPath = Path();
+      rimPath.moveTo(0, surface[0]);
+      for (int i = 1; i <= steps; i++) {
+        final x1 = i / steps * w;
+        rimPath.lineTo(x1, surface[i]);
+      }
+      final rimPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..color = glareColor.withOpacity(0.55);
+      canvas.drawPath(rimPath, rimPaint);
+    }
+  }
+
+  // ── Bubbles ────────────────────────────────────────────────────────────────
+  // Simple rising circles — no per-bubble shader, just Paint with alpha
+
+  void _paintBubbles(Canvas canvas, double w, double h, List<double> surface,
+      double slow, double med) {
+    // 5 columns × 12 bubbles = 60 draw calls max
+    const cols = 5;
+    const bubblesPerCol = 12;
+    final rng = math.Random(42);
+
+    final colXs = List.generate(cols, (i) {
+      return (i + 0.5 + (rng.nextDouble() - 0.5) * 0.3) / cols * w;
+    });
+    final colSpeeds = List.generate(cols, (i) => 0.14 + rng.nextDouble() * 0.10);
 
     for (int col = 0; col < cols; col++) {
-      final colX = (col + 0.5 + seededRng.nextDouble() * 0.3) / cols * w;
-      // Each column has ~18 bubbles at different phases
-      const bubblesPerCol = 18;
+      final cx = colXs[col];
+      final speed = colSpeeds[col];
 
       for (int b = 0; b < bubblesPerCol; b++) {
-        final phase = b / bubblesPerCol; // 0..1
-        // Bubble travels from bottom to surface
-        final rawY = _frac(phase + t * (0.18 + seededRng.nextDouble() * 0.14));
-        final yFrac = 1.0 - rawY; // 1=bottom, 0=top
-        final by = h * 0.42 + yFrac * (h * 0.55);
+        final phase = b / bubblesPerCol;
+        // yFrac: 0=surface, 1=bottom. Bubble rises from 1→0
+        final yRaw  = 1.0 - _frac(phase + t * speed);
+        final by    = h * 0.42 + yRaw * (h * 0.55);
 
-        // Surface index
-        final si = ((colX / w) * (surface.length - 1)).clamp(0, surface.length - 2).toInt();
-        final surfY = surface[si];
-        if (by < surfY) continue; // above surface, skip
+        // Surface clip
+        final si = ((cx / w) * (surface.length - 1)).clamp(0, surface.length - 2).toInt();
+        if (by < surface[si]) continue;
 
-        // Horizontal wobble
-        final wobble = _sin(fast * 0.8 + b * 2.1 + col * 0.7) * 4.0;
-        final bx = colX + wobble;
+        // Gentle horizontal drift
+        final drift = math.sin(slow * 0.7 + b * 1.9 + col * 0.8) * 3.5;
+        final bx = cx + drift;
 
-        // Bubble size grows as it rises
-        final r = (1.5 + yFrac * 3.5) * (w / 400);
+        // Bubbles get slightly larger as they rise (decompression)
+        final r = (1.2 + yRaw * 2.8) * (w / 400).clamp(0.5, 2.5);
+
         // Fade near surface
-        final distToSurface = (by - surfY).clamp(0.0, 60.0);
-        final alpha = (0.25 + yFrac * 0.35) * (distToSurface / 60.0);
+        final distToSurf = (by - surface[si]).clamp(0.0, 50.0);
+        final alpha = (0.20 + yRaw * 0.30) * (distToSurf / 50.0);
 
-        // Draw bubble: ring + highlight
+        // Draw as ring (stroke only — realistic bubble look)
         final paint = Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = r * 0.4
-          ..color = _bubble.withOpacity(alpha.clamp(0, 1));
+          ..strokeWidth = r * 0.45
+          ..color = bubbleColor.withOpacity(alpha.clamp(0.0, 0.7));
         canvas.drawCircle(Offset(bx, by), r, paint);
 
-        // Tiny specular on bubble
-        if (r > 2.5) {
-          final hPaint = Paint()
-            ..color = _spark.withOpacity(alpha * 0.6);
+        // Tiny specular dot on bubble
+        if (r > 1.8 && alpha > 0.15) {
+          final specPaint = Paint()
+            ..color = glareColor.withOpacity(alpha * 0.5);
           canvas.drawCircle(
-            Offset(bx - r * 0.3, by - r * 0.3),
-            r * 0.22,
-            hPaint,
+            Offset(bx - r * 0.28, by - r * 0.28),
+            r * 0.20,
+            specPaint,
           );
         }
       }
     }
   }
 
-  // ── Pour stream ───────────────────────────────────────────────────────────
+  // ── Pour stream ────────────────────────────────────────────────────────────
 
-  void _drawPourStream(Canvas canvas, Size size, double slow, double med) {
-    final w = size.width;
-    final h = size.height;
+  void _paintPourStream(Canvas canvas, double w, double h, List<double> surface,
+      double slow, double med) {
+    // Stream enters from top-right area
+    final landX = w * 0.58 + math.sin(slow * 0.35) * w * 0.025;
+    final topX  = landX + math.sin(slow * 0.55) * w * 0.015 + w * 0.04;
+    final topY  = -h * 0.03;
 
-    // Stream lands slightly left of center, wiggles
-    final landX = w * 0.52 + _sin(slow * 0.4) * w * 0.04;
-    // Stream top (off screen slightly)
-    final streamTopX = landX + _sin(slow * 0.6) * w * 0.02;
-    final streamTopY = -h * 0.04;
+    const steps = 30;
 
-    // Build stream path — tapers as it falls (accelerates, narrows)
-    const steps = 40;
+    // Stream left and right edges
+    double lx(int i) {
+      final f = i / steps.toDouble();
+      final taper = 7.0 * (1.0 - f * 0.5) * (w / 400).clamp(0.5, 2.0);
+      final wob = math.sin(med * 0.4 + f * math.pi * 1.8) * 2.5 * f;
+      return topX + (landX - topX) * f + wob - taper;
+    }
+
+    double rx(int i) {
+      final f = i / steps.toDouble();
+      final taper = 7.0 * (1.0 - f * 0.5) * (w / 400).clamp(0.5, 2.0);
+      final wob = math.sin(med * 0.4 + f * math.pi * 1.8) * 2.5 * f;
+      return topX + (landX - topX) * f + wob + taper;
+    }
+
+    double sy(int i) {
+      final f = i / steps.toDouble();
+      // Parabolic drop: starts slow, accelerates
+      return topY + (h * 0.48 - topY) * (f * f * 0.55 + f * 0.45);
+    }
+
+    // Only draw stream above the surface
+    final landSI = ((landX / w) * (surface.length - 1)).clamp(0, surface.length - 2).toInt();
+    final landSurfY = surface[landSI];
+    final endStep = steps; // we let it clip naturally
+
     final path = Path();
-
-    double leftX(int i) {
-      final frac = i / steps.toDouble();
-      final taper = 8.0 * (1 - frac * 0.6) * (w / 400);
-      final wobble = _sin(med * 0.5 + frac * math.pi * 2) * 3 * frac;
-      final x = streamTopX + (landX - streamTopX) * frac + wobble;
-      return x - taper;
+    path.moveTo(lx(0), sy(0));
+    for (int i = 1; i <= endStep; i++) {
+      path.lineTo(lx(i), sy(i));
     }
-    double rightX(int i) {
-      final frac = i / steps.toDouble();
-      final taper = 8.0 * (1 - frac * 0.6) * (w / 400);
-      final wobble = _sin(med * 0.5 + frac * math.pi * 2) * 3 * frac;
-      final x = streamTopX + (landX - streamTopX) * frac + wobble;
-      return x + taper;
-    }
-    double streamY(int i) {
-      // Parabolic fall
-      final frac = i / steps.toDouble();
-      return streamTopY + (h * 0.5 - streamTopY) * (frac * frac * 0.6 + frac * 0.4);
-    }
-
-    // Left edge
-    path.moveTo(leftX(0), streamY(0));
-    for (int i = 1; i <= steps; i++) {
-      path.lineTo(leftX(i), streamY(i));
-    }
-    // Right edge (reversed)
-    for (int i = steps; i >= 0; i--) {
-      path.lineTo(rightX(i), streamY(i));
+    for (int i = endStep; i >= 0; i--) {
+      path.lineTo(rx(i), sy(i));
     }
     path.close();
 
     final streamPaint = Paint()
       ..shader = LinearGradient(
         colors: [
-          _bright.withOpacity(0.9),
-          _mid.withOpacity(0.85),
-          _mid.withOpacity(0.7),
+          streamColor.withOpacity(0.9),
+          streamColor.withOpacity(0.75),
+          liquidTop.withOpacity(0.8),
         ],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(landX - 20, streamTopY, 40, h * 0.55));
+      ).createShader(Rect.fromLTWH(landX - 20, topY, 40, h * 0.52));
     canvas.drawPath(path, streamPaint);
 
-    // Specular highlight on stream (left edge glow)
+    // Left-edge specular line on stream
     final specPath = Path();
-    specPath.moveTo(leftX(0) + 2, streamY(0));
-    for (int i = 1; i <= steps; i++) {
-      specPath.lineTo(leftX(i) + 2, streamY(i));
+    specPath.moveTo(lx(0) + 1.5, sy(0));
+    for (int i = 1; i <= endStep; i++) {
+      specPath.lineTo(lx(i) + 1.5, sy(i));
     }
     final specPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
+      ..strokeWidth = 2.0
       ..shader = LinearGradient(
         colors: [
-          _spark.withOpacity(0.7),
-          _spark.withOpacity(0.2),
+          glareColor.withOpacity(isDark ? 0.35 : 0.75),
           Colors.transparent,
         ],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(landX - 20, streamTopY, 40, h * 0.5));
+      ).createShader(Rect.fromLTWH(landX - 20, topY, 40, h * 0.48));
     canvas.drawPath(specPath, specPaint);
 
-    // Impact splash at bottom of stream
-    _drawImpactSplash(canvas, size, landX, slow, med);
-  }
-
-  // ── Impact splash ─────────────────────────────────────────────────────────
-
-  void _drawImpactSplash(Canvas canvas, Size size, double landX,
-      double slow, double med) {
-    final h = size.height;
-    // Find surface Y at landX
-    final surfY = h * 0.38 + _sin(slow) * h * 0.025;
-
-    // Concentric rings expanding from impact
-    for (int ring = 0; ring < 4; ring++) {
-      final phase = _frac(t * 2.0 + ring * 0.25);
-      final r = phase * 40 * (size.width / 400);
-      final alpha = (1.0 - phase) * 0.35;
-      final paint = Paint()
+    // Impact rings at landing point
+    for (int ring = 0; ring < 3; ring++) {
+      final phase = _frac(t * 2.2 + ring * 0.33);
+      final r  = phase * 36 * (w / 400).clamp(0.6, 1.8);
+      final al = (1.0 - phase) * 0.30;
+      final rPaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5
-        ..color = _bright.withOpacity(alpha);
+        ..strokeWidth = 1.2
+        ..color = liquidTop.withOpacity(al);
       canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(landX, surfY),
-          width: r * 2.5,
-          height: r * 0.6,
-        ),
-        paint,
+        Rect.fromCenter(center: Offset(landX, landSurfY), width: r * 2.4, height: r * 0.55),
+        rPaint,
       );
     }
-
-    // Upward splash droplets
-    const drops = 8;
-    for (int d = 0; d < drops; d++) {
-      final angle = (d / drops) * math.pi - math.pi * 0.1;
-      final phase = _frac(t * 3.0 + d * 0.125);
-      final vel = 0.5 + (d % 3) * 0.2;
-      final dx = math.cos(angle) * phase * 30 * vel;
-      final dy = -(math.sin(angle) * phase * 25 * vel - phase * phase * 30);
-      final alpha = (1.0 - phase) * 0.55;
-      final r = (2.0 + d % 2) * (size.width / 400);
-      final paint = Paint()
-        ..color = _bright.withOpacity(alpha);
-      canvas.drawCircle(Offset(landX + dx, surfY + dy), r, paint);
-    }
   }
 
-  // ── Foam collar ───────────────────────────────────────────────────────────
+  // ── Foam ───────────────────────────────────────────────────────────────────
 
-  void _drawFoamCollar(Canvas canvas, Size size, List<double> surface) {
-    final w = size.width;
+  void _paintFoam(Canvas canvas, double w, double h, List<double> surface, double slow) {
     final steps = surface.length - 1;
+    final rng = math.Random(7);
 
-    // Draw foam as overlapping circles along the surface
-    final rng = math.Random(13);
-    const foamDots = 90;
-
-    for (int i = 0; i < foamDots; i++) {
-      final frac = i / foamDots.toDouble();
-      final x = frac * w;
+    // ~50 foam blobs scattered along surface
+    for (int i = 0; i < 50; i++) {
+      final frac = i / 50.0;
+      final x  = frac * w + math.sin(slow * 0.3 + i) * 3.0;
       final si = (frac * steps).clamp(0, steps - 1).toInt();
-      final y = surface[si];
-
-      // Cluster foam dots around surface
-      final oy = rng.nextDouble() * 12 - 8;
-      final r  = 4.0 + rng.nextDouble() * 8.0;
-      final alpha = 0.15 + rng.nextDouble() * 0.25;
-
-      final paint = Paint()
-        ..color = _foam.withOpacity(alpha);
-      canvas.drawCircle(Offset(x + rng.nextDouble() * 12 - 6, y + oy), r, paint);
+      final y  = surface[si];
+      final oy = rng.nextDouble() * 10 - 7;
+      final r  = 3.5 + rng.nextDouble() * 7.0;
+      final al = isDark ? 0.08 + rng.nextDouble() * 0.12 : 0.18 + rng.nextDouble() * 0.20;
+      final paint = Paint()..color = foamColor.withOpacity(al);
+      canvas.drawCircle(Offset(x + rng.nextDouble() * 8 - 4, y + oy), r, paint);
     }
 
-    // Dense bright foam band right at the surface
-    final surfacePaint = Paint()
+    // Dense foam band right at the surface line
+    final foamPath = Path();
+    foamPath.moveTo(0, surface[0] - 4);
+    for (int i = 1; i <= steps; i++) {
+      foamPath.lineTo(i / steps * w, surface[i] - 4 + rng.nextDouble() * 6);
+    }
+    for (int i = steps; i >= 0; i--) {
+      foamPath.lineTo(i / steps * w, surface[i] + 8);
+    }
+    foamPath.close();
+
+    final foamPaint = Paint()
       ..shader = LinearGradient(
         colors: [
-          _foam.withOpacity(0.35),
-          _foam.withOpacity(0.0),
+          foamColor.withOpacity(isDark ? 0.22 : 0.35),
+          foamColor.withOpacity(0.0),
         ],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(0, 0, w, size.height));
-
-    final foamPath = Path();
-    foamPath.moveTo(0, surface[0] - 6);
-    for (int i = 1; i <= steps; i++) {
-      final x = i / steps * w;
-      foamPath.lineTo(x, surface[i] - 6 + rng.nextDouble() * 8);
-    }
-    for (int i = steps; i >= 0; i--) {
-      final x = i / steps * w;
-      foamPath.lineTo(x, surface[i] + 10);
-    }
-    foamPath.close();
-    canvas.drawPath(foamPath, surfacePaint);
+      ).createShader(Rect.fromLTWH(0, 0, w, h));
+    canvas.drawPath(foamPath, foamPaint);
   }
 
-  // ── Sparkles ──────────────────────────────────────────────────────────────
+  // ── Top fade ───────────────────────────────────────────────────────────────
+  // Soft gradient at top so UI elements above blend cleanly
 
-  void _drawSparkles(Canvas canvas, Size size, List<double> surface,
-      double fast) {
-    final w = size.width;
-    final h = size.height;
-    final rng = math.Random(99);
-    const count = 55;
-
-    for (int i = 0; i < count; i++) {
-      final x = rng.nextDouble() * w;
-      final baseY = rng.nextDouble() * h * 0.5 + h * 0.38;
-      // Twinkle
-      final phase = _frac(t * 1.8 + i * 0.057);
-      final alpha = (_sin(phase * math.pi * 2) * 0.5 + 0.5) * 0.7;
-      final r = 1.0 + rng.nextDouble() * 1.5;
-
-      final si = ((x / w) * (surface.length - 1)).clamp(0, surface.length - 2).toInt();
-      if (baseY < surface[si]) continue;
-
-      final paint = Paint()..color = _spark.withOpacity(alpha);
-      canvas.drawCircle(Offset(x, baseY), r, paint);
-
-      // Cross flare for some
-      if (i % 5 == 0 && alpha > 0.5) {
-        final flarePaint = Paint()
-          ..color = _spark.withOpacity(alpha * 0.4)
-          ..strokeWidth = 0.8
-          ..style = PaintingStyle.stroke;
-        final fl = r * 3;
-        canvas.drawLine(Offset(x - fl, baseY), Offset(x + fl, baseY), flarePaint);
-        canvas.drawLine(Offset(x, baseY - fl), Offset(x, baseY + fl), flarePaint);
-      }
-    }
+  void _paintTopFade(Canvas canvas, double w, double h) {
+    final paint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          bg1,
+          bg1.withOpacity(0.0),
+        ],
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        stops: const [0.0, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, w, h * 0.22));
+    canvas.drawRect(Rect.fromLTWH(0, 0, w, h * 0.22), paint);
   }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  static double _frac(double x) => x - x.floorToDouble();
 
   @override
-  bool shouldRepaint(_SodaPainter old) =>
-      old.t != t || old.isDark != isDark;
+  bool shouldRepaint(_SodaPainter old) => old.t != t || old.isDark != isDark;
 }
