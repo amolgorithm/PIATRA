@@ -203,7 +203,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
         // To buy
         if (unchecked.isNotEmpty) ...[
           _ListSection(
-              title: 'To Buy (${unchecked.length})',
+              text: 'To Buy (${unchecked.length})',
               isDark: isDark),
           ...unchecked.map((item) {
             final idx = _list.items.indexOf(item);
@@ -219,7 +219,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
         // Checked
         if (checked.isNotEmpty) ...[
           _ListSection(
-              title: 'In Cart (${checked.length})',
+              text: 'In Cart (${checked.length})',
               isDark: isDark,
               color: AppTheme.successGreen),
           ...checked.map((item) {
@@ -238,7 +238,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
           GestureDetector(
             onTap: () => setState(() => _showHave = !_showHave),
             child: _ListSection(
-              title:
+              text:
                   'Already Have (${_list.alreadyInPantry.length}) ${_showHave ? '▲' : '▼'}',
               isDark: isDark,
               color: AppTheme.infoBlue,
