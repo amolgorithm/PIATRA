@@ -1,12 +1,10 @@
 // lib/ml/pantry_scanner.dart
 //
-// Uses Gemini Vision (gemini-2.5-flash) via the Anthropic-style REST call to
-// the app's own backend /api/assistant/chat endpoint — no extra API key needed
-// on the client.  Falls back gracefully when the backend is unreachable.
+// Uses Gemini Vision (gemini-2.5-flash) via the app's own backend
+// /api/assistant/chat endpoint — no extra API key needed on the client.
 //
-// Replaces the old Google ML Kit Image Labeling approach which only produced
-// coarse labels like "Food", "Vegetable", "Plant" instead of specific names
-// like "red bell pepper", "Greek yogurt", or "Dijon mustard".
+// Fixed: prompt now forbids generic category labels and forces specific
+// grocery-store names. Handles multi-ingredient images correctly.
 
 import 'dart:convert';
 import 'dart:io';
@@ -21,7 +19,6 @@ class PantryScanner {
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   Future<void> initialize() async {
-    // Nothing to warm up — the backend is stateless.
     _isInitialized = true;
     debugPrint('✅ PantryScanner: Gemini Vision backend ready');
   }
@@ -34,12 +31,9 @@ class PantryScanner {
 
   // ── Main detection entry point ─────────────────────────────────────────────
 
-  /// Sends [imagePath] to the Gemini-powered backend and returns a list of
-  /// [DetectionResult] objects with specific ingredient names and confidence
-  /// scores derived from Gemini's response ordering.
   Future<List<DetectionResult>> detectObjects(
     String imagePath, {
-    dynamic imageFile, // unused — kept for API compatibility
+    dynamic imageFile,
   }) async {
     if (!_isInitialized) await initialize();
 
@@ -60,33 +54,45 @@ class PantryScanner {
 
   Future<List<DetectionResult>> _callGeminiVision(
       String base64Image, String mimeType) async {
+    // IMPORTANT: This prompt is designed to force Gemini to be specific.
+    // Generic labels like "fruit", "vegetable", "food" are explicitly banned.
     const prompt = '''
-You are a precise kitchen inventory assistant. Examine this image carefully and identify every distinct food ingredient, grocery item, or pantry product you can see.
+You are a highly precise kitchen inventory scanner. Your job is to identify every specific food item visible in this image.
 
-Return ONLY a JSON array — no markdown, no explanation, no wrapper object.
-Each element must have exactly two fields:
-  "name": a specific, common grocery-store name (e.g. "red bell pepper", "Greek yogurt 2%", "Dijon mustard", "basmati rice", "free-range eggs", "baby spinach", "unsalted butter", "garlic cloves", "cherry tomatoes", "cheddar cheese")
-  "confidence": a number between 0.0 and 1.0 reflecting how certain you are
+CRITICAL RULES — YOU MUST FOLLOW THESE:
+1. NEVER use generic category names. BANNED words: "fruit", "vegetable", "food", "produce", "ingredient", "item", "object", "plant", "dairy", "meat", "grain".
+2. ALWAYS use the specific common name as you would see on a grocery store label or receipt.
+   - NOT "fruit" → YES "apple", "red apple", "green apple", "Granny Smith apple"
+   - NOT "vegetable" → YES "broccoli", "red bell pepper", "baby carrots"
+   - NOT "dairy" → YES "whole milk", "cheddar cheese", "Greek yogurt"
+   - NOT "meat" → YES "chicken breast", "ground beef", "salmon fillet"
+3. If you can see a brand name clearly, include it: "Heinz ketchup", "Quaker oats".
+4. If there are multiple items, list ALL of them — do not skip any visible food.
+5. Include partial items if clearly identifiable.
+6. Be as specific as possible about variety/type: "cherry tomatoes" not just "tomatoes", "baby spinach" not just "spinach".
 
-Rules:
-- Be as SPECIFIC as possible. "grapes" not "fruit". "sourdough bread" not "bread". "Greek yogurt" not "dairy".
-- If you see a brand label you recognise, you may include it: "Heinz ketchup".
-- List every distinct item visible, even partially. Up to 30 items.
-- If the image contains no food at all, return an empty array: []
-- Do NOT include non-food items unless they are food-adjacent containers with readable labels.
-- Order by descending confidence.
+Return ONLY a valid JSON array. No markdown, no explanation, no text before or after.
+Each element: {"name": "specific name here", "confidence": 0.0-1.0}
 
-Example of correct output:
+If the image has NO food items at all, return: []
+
+Examples of CORRECT output:
 [
-  {"name": "red bell pepper", "confidence": 0.97},
-  {"name": "baby spinach", "confidence": 0.94},
-  {"name": "garlic cloves", "confidence": 0.91}
+  {"name": "Granny Smith apple", "confidence": 0.96},
+  {"name": "red bell pepper", "confidence": 0.94},
+  {"name": "baby spinach", "confidence": 0.91},
+  {"name": "Greek yogurt", "confidence": 0.88},
+  {"name": "free-range eggs", "confidence": 0.85}
 ]
-''';
 
-    // We send via the backend's /api/assistant/chat endpoint which already
-    // has the Gemini SDK wired up.  We embed the image as a data URI in the
-    // message body so the backend can pass it through to Gemini's vision model.
+Examples of WRONG output (DO NOT DO THIS):
+[
+  {"name": "fruit", "confidence": 0.9},
+  {"name": "vegetable", "confidence": 0.8}
+]
+
+Now analyze the image and return the JSON array:''';
+
     final payload = jsonEncode({
       'message': prompt,
       'context': 'VISION_SCAN::$mimeType::$base64Image',
@@ -99,7 +105,7 @@ Example of correct output:
           headers: {'Content-Type': 'application/json'},
           body: payload,
         )
-        .timeout(const Duration(seconds: 45));
+        .timeout(const Duration(seconds: 60));
 
     if (response.statusCode != 200) {
       throw Exception('Backend returned ${response.statusCode}');
@@ -108,7 +114,26 @@ Example of correct output:
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     final raw = (body['response'] as String? ?? '').trim();
 
-    return _parseGeminiResponse(raw);
+    debugPrint('🔍 PantryScanner raw response: $raw');
+
+    final results = _parseGeminiResponse(raw);
+
+    // If we got generic labels back despite the prompt, filter them out
+    // and log a warning so we can debug
+    final genericLabels = {
+      'fruit', 'vegetable', 'food', 'produce', 'ingredient',
+      'item', 'object', 'plant', 'dairy', 'meat', 'grain', 'beverage',
+    };
+    final filtered = results.where((r) {
+      final nameLower = r.label.toLowerCase();
+      if (genericLabels.contains(nameLower)) {
+        debugPrint('⚠️  PantryScanner: filtered out generic label "${r.label}"');
+        return false;
+      }
+      return true;
+    }).toList();
+
+    return filtered;
   }
 
   // ── Response parser ────────────────────────────────────────────────────────
@@ -161,14 +186,10 @@ Example of correct output:
   }
 
   // ── filterFoodItems ────────────────────────────────────────────────────────
-  //
-  // Gemini already returns only food items, so this is a lightweight passthrough
-  // that simply drops anything below a minimum confidence threshold.
-  // The old keyword-list approach is no longer needed.
 
   List<DetectionResult> filterFoodItems(
     List<DetectionResult> all, {
-    double minConfidence = 0.40,
+    double minConfidence = 0.35,
   }) {
     final filtered = all.where((d) => d.confidence >= minConfidence).toList();
     debugPrint(

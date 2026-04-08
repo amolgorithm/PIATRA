@@ -1,4 +1,6 @@
 import base64
+import json
+import re
 import google.generativeai as genai
 from app.core.config import Config
 from app.utils.text_processing import format_gemini_response
@@ -22,16 +24,74 @@ class AIAssistant:
             return f"Sorry, I encountered an error: {e}"
 
     def _call_model_with_image(self, prompt: str, image_bytes: bytes, mime_type: str) -> str:
-        """Single-turn multimodal call with an inline image."""
+        """
+        Single-turn multimodal call with an inline image.
+        Returns raw text — NOT passed through format_gemini_response,
+        because the response is expected to be a JSON array.
+        """
         try:
             image_part = {
                 "mime_type": mime_type,
                 "data": image_bytes,
             }
-            response = self.model.generate_content([prompt, image_part])
-            return response.text.strip()
+            # Use a generation config that strongly discourages markdown wrapping
+            generation_config = {
+                "temperature": 0.1,      # Low temperature = more deterministic, less creative
+                "top_p": 0.8,
+                "max_output_tokens": 2048,
+            }
+            response = self.model.generate_content(
+                [prompt, image_part],
+                generation_config=generation_config,
+            )
+            raw = response.text.strip()
+
+            # Strip any accidental markdown fences the model may add
+            raw = re.sub(r'```(?:json)?\s*', '', raw)
+            raw = raw.replace('```', '').strip()
+
+            # Validate it's actually a JSON array before returning
+            # If not, try to extract the array portion
+            if not raw.startswith('['):
+                match = re.search(r'\[.*\]', raw, re.DOTALL)
+                if match:
+                    raw = match.group(0)
+                else:
+                    print(f"[AIAssistant] Vision: no JSON array found in response: {raw[:200]}")
+                    return "[]"
+
+            # Quick sanity-check parse
+            try:
+                parsed = json.loads(raw)
+                if not isinstance(parsed, list):
+                    return "[]"
+
+                # Filter out any generic labels that slipped through
+                generic_labels = {
+                    'fruit', 'vegetable', 'food', 'produce', 'ingredient',
+                    'item', 'object', 'plant', 'dairy', 'meat', 'grain',
+                    'beverage', 'drink',
+                }
+                filtered = [
+                    entry for entry in parsed
+                    if isinstance(entry, dict)
+                    and entry.get('name', '').lower().strip() not in generic_labels
+                    and entry.get('name', '').strip() != ''
+                ]
+
+                print(f"[AIAssistant] Vision scan: {len(filtered)} items detected (was {len(parsed)} before generic filter)")
+                for item in filtered[:10]:
+                    print(f"  - {item.get('name')} ({item.get('confidence', '?')})")
+
+                return json.dumps(filtered)
+
+            except json.JSONDecodeError as e:
+                print(f"[AIAssistant] Vision JSON parse error: {e} | raw: {raw[:300]}")
+                return "[]"
+
         except Exception as e:
-            return f"[]"  # Return empty JSON array on error so the client degrades gracefully
+            print(f"[AIAssistant] Vision scan model error: {e}")
+            return "[]"
 
     # ------------------------------------------------------------------
     # Public API
@@ -73,10 +133,15 @@ Guidelines:
             # Format: "VISION_SCAN::<mime_type>::<base64_data>"
             parts = context.split("::", 2)
             if len(parts) != 3:
+                print(f"[AIAssistant] Vision scan: malformed context, got {len(parts)} parts")
                 return "[]"
 
             _, mime_type, b64_data = parts
+            print(f"[AIAssistant] Vision scan: mime={mime_type}, image_size={len(b64_data)} chars")
+
             image_bytes = base64.b64decode(b64_data)
+            print(f"[AIAssistant] Vision scan: decoded {len(image_bytes)} bytes")
+
             return self._call_model_with_image(prompt, image_bytes, mime_type)
         except Exception as e:
             print(f"[AIAssistant] Vision scan error: {e}")
