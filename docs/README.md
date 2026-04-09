@@ -1,295 +1,169 @@
-# PIATRA AI Assistant - Context-Aware Enhancement Documentation
+# PIATRA — Documentation
 
-## 📚 Documentation Overview
-
-This folder contains comprehensive documentation about PIATRA's new context-aware AI assistant feature.
-
-### Documents
-
-#### 1. **QUICK_REFERENCE.md** ⭐ START HERE
-   - **Best for:** Quick overview, finding code locations
-   - **Read time:** 5 minutes
-   - **Contains:** Summary of changes, file locations, code examples
-   - **Use when:** You want a fast overview or need to find something quickly
-
-#### 2. **INTEGRATION_GUIDE.md** 🔧 FOR DEVELOPERS
-   - **Best for:** Implementing or integrating the feature
-   - **Read time:** 15-20 minutes
-   - **Contains:** Step-by-step setup, API reference, testing checklist
-   - **Use when:** You're implementing this or need to understand the flow
-
-#### 3. **context_aware_assistant.md** 📖 FEATURE OVERVIEW
-   - **Best for:** Understanding the feature at a high level
-   - **Read time:** 10-15 minutes
-   - **Contains:** What changed, benefits, how it works, API usage
-   - **Use when:** You want to understand the overall approach
-
-#### 4. **assistant_context_spec.md** 📊 TECHNICAL DETAILS
-   - **Best for:** Understanding exactly what data is included
-   - **Read time:** 10-15 minutes
-   - **Contains:** Data structure, usage examples, context details
-   - **Use when:** You need to know specific details about context content
-
-#### 5. **RESPONSE_EXAMPLES.md** 💬 BEFORE & AFTER
-   - **Best for:** Seeing the impact and improvements
-   - **Read time:** 10-15 minutes
-   - **Contains:** Real examples comparing old vs new responses
-   - **Use when:** You want to see concrete examples of improvements
+This folder contains technical documentation for the PIATRA project.
 
 ---
 
-## 🎯 Quick Start by Role
+## Documents
 
-### I'm a Developer (Backend)
-```
-1. Read: QUICK_REFERENCE.md (2 min)
-2. Read: INTEGRATION_GUIDE.md sections 1-2 (5 min)
-3. Check: Modified backend files
-4. Done!
-```
+### `README.md` ← you are here
+Index of all documentation.
 
-### I'm a Developer (Frontend/Mobile)
-```
-1. Read: QUICK_REFERENCE.md (2 min)
-2. Check: assistant_screen.dart changes
-3. Read: assistant_service_example.dart (3 min)
-4. Implement: Send user_id in your requests
-5. Done!
-```
+### `api_spec.md`
+Full API reference — all endpoints, request/response shapes, authentication requirements, and error codes.
 
-### I'm a Project Manager
-```
-1. Read: context_aware_assistant.md (5 min)
-2. Read: RESPONSE_EXAMPLES.md (5 min)
-3. Understand: Benefits section
-4. You're good to go!
-```
+### `system_overview.md`
+High-level architecture diagram and data-flow descriptions covering how the Flutter app, FastAPI backend, Firebase, Spoonacular, and Gemini AI interact.
 
-### I'm QA/Testing
+---
+
+## Quick Architecture Summary
+
 ```
-1. Read: INTEGRATION_GUIDE.md section "Testing" (5 min)
-2. Read: QUICK_REFERENCE.md "Testing Checklist" (2 min)
-3. Run the curl commands provided
-4. Test with various user profiles
-5. Done!
+┌─────────────────────────────────────────────────────┐
+│                  Flutter Mobile App                  │
+│                                                      │
+│  Screens: Home, Pantry, Scan, Recipes, Cooking,     │
+│           Meal Plan, Analytics, Assistant, Profile   │
+│                                                      │
+│  State: UserProvider, RecipeProvider,                │
+│         SavedRecipesProvider, ThemeProvider          │
+│                                                      │
+│  Local storage: SQLite (sqflite) — pantry cache      │
+└──────────┬──────────────────────┬───────────────────┘
+           │                      │
+           │ REST (HTTP)           │ Firebase SDK
+           ▼                      ▼
+┌──────────────────┐   ┌─────────────────────────────┐
+│  FastAPI Backend │   │         Firebase             │
+│                  │   │                              │
+│  /api/assistant  │   │  Firestore collections:      │
+│  /api/users      │   │   • user_profiles/{uid}      │
+│  /api/feedback   │   │   • pantry_items/{id}        │
+│                  │   │   • meal_plans/{uid}/weeks   │
+│  Gemini 2.5      │   │   • nutrition_logs/{uid}     │
+│  Flash (text +   │   │   • recipe_history/{uid}     │
+│  vision)         │   │   • saved_recipes/{uid}      │
+└──────────────────┘   └─────────────────────────────┘
+           │
+           ▼
+┌──────────────────┐
+│   Spoonacular    │
+│   Recipe API     │
+│                  │
+│  findByIngred.   │
+│  complexSearch   │
+│  informationBulk │
+└──────────────────┘
 ```
 
 ---
 
-## 🚀 What Changed (TL;DR)
+## Key Flows
 
-### The Problem
-AI was generic and didn't know about:
-- Your pantry contents
-- Your dietary restrictions
-- Your allergies
-- Your preferences
+### Pantry Scan
+1. User takes a photo in `ScanScreen`
+2. `PantryScanner` sends the image (base64) to `/api/assistant/chat` with `context = "VISION_SCAN::<mime>::<base64>"`
+3. Backend decodes context, calls Gemini Vision with a strict JSON-array prompt
+4. Response is parsed into `DetectionResult` objects
+5. User reviews and edits detected items in `_DetectionResultsSheet`
+6. Confirmed items are written to SQLite via `PantrySyncManager` and pushed to Firestore
 
-### The Solution
-Now the AI gets full context:
-```
-✅ Pantry inventory (what you have)
-✅ Profile info (who you are)
-✅ Dietary preferences (your goals)
-✅ Allergies (your safety)
-```
+### Recipe Recommendations
+1. `RecipeProvider.loadRecommendations()` is called with the current `UserProfileModel`
+2. **Pass 1**: `SpoonacularService.findByIngredients()` — pantry-first, returns up to 30 lightweight results
+3. **Pass 2**: `SpoonacularService.complexSearch()` — diet/cuisine/intolerance filters applied, up to 20 results
+4. **Pass 3** (if cuisine filter active and < 5 matches): cuisine-only search without pantry constraint
+5. All results are deduped and bulk-fetched for full nutrition/steps data
+6. `RecipeRankingEngine.rankAndFilter()` scores and partitions results
+7. UI renders ranked list with pantry-match bar, reason chips, and cuisine grouping
 
-### The Result
-```
-Before: "You could make pasta..."
-After: "Sarah! With your chicken and rice, and avoiding shellfish,
-        I suggest Italian Risotto (high-protein, 30 min)..."
-```
+### Cooking Mode
+1. User taps "Start Cooking" on a recipe detail screen
+2. `CookingModeScreen` renders steps with per-step timer (auto-detected from step text)
+3. The AI sous-chef panel has full recipe + current step context
+4. On "Finish!", `NutritionHistoryService.logMeal()` and `RecipeHistoryService.recordCook()` are called
+5. Completion screen shows macros and offers navigation to Analytics
 
----
-
-## 📋 Files Modified
-
-### Backend Changes
-```
-app/api/assistant.py
-  ├─ Added user_id parameter to requests
-  ├─ Integrated ContextBuilder
-  └─ Auto-loads context if user_id provided
-
-app/services/ai_assistant.py
-  ├─ Better system prompts
-  ├─ Accepts context parameter
-  └─ More personalized responses
-
-app/services/context_builder.py (NEW)
-  ├─ Gathers user profile
-  ├─ Gets pantry items
-  ├─ Gets dietary preferences
-  └─ Builds rich context string
-
-app/db/pantry_repository.py
-  ├─ Complete CRUD implementation
-  ├─ add_item(), get_pantry_items()
-  ├─ update_item(), delete_item()
-  └─ Working pantry management
-```
-
-### Frontend Changes
-```
-mobile_app/lib/ui/screens/assistant_screen.dart
-  ├─ Import UserProvider
-  ├─ Extract user_id from auth
-  └─ Send with every chat message
-
-mobile_app/lib/services/assistant_service_example.dart (NEW)
-  ├─ Example service methods
-  ├─ Usage examples
-  └─ Best practices
-```
+### Context-Aware AI Chat
+1. `AssistantScreen._fetchAIResponse()` builds context from local pantry (SQLite) + profile (`UserProvider`)
+2. Sends `{ message, context, user_id }` to `/api/assistant/chat`
+3. Backend optionally enriches context further via `ContextBuilder` (Firestore pantry + profile)
+4. Gemini response is formatted via `format_gemini_response()` (bold → Unicode bold, `-` → `•`)
+5. Response rendered in chat bubble
 
 ---
 
-## 🔌 API Changes
+## Data Models
 
-### New Parameter: `user_id`
+### `UserProfileModel` (Flutter)
+| Field | Type | Description |
+|-------|------|-------------|
+| `uid` | String | Firebase UID |
+| `displayName` | String | Display name |
+| `cookingMode` | CookingMode | General / QuickMeals / HealthyEating / BulkCooking / BudgetFriendly / Gourmet |
+| `calorieTarget` | int | Daily calorie goal |
+| `macroTargets` | MacroTargets | Protein / carbs / fat in grams |
+| `favoriteCuisines` | List\<String\> | Ranked cuisine preferences |
+| `dietaryPreferences` | List\<String\> | Hard exclusion diets (vegan, keto, etc.) |
+| `allergies` | List\<String\> | Hard exclusion allergens |
 
-All endpoints now accept optional `user_id`:
+### `PantryItem` (Flutter)
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | String | Unique ID (timestamp-based for scanned items) |
+| `name` | String | Ingredient name |
+| `quantity` | String | Free-form quantity string |
+| `expiryDate` | DateTime? | Optional expiry date |
+| `category` | String | Vegetables / Fruits / Dairy / Meat / Grains & Legumes / Beverages / Bakery / Other |
 
-```json
-POST /api/assistant/chat
-POST /api/assistant/nutrition-advice
-POST /api/assistant/recipe-suggestions
+### `RecipeFilter`
+Encapsulates all filter and sort criteria for the recipe ranking engine. Key fields: `cuisines`, `diets`, `intolerances`, `dishTypes`, `maxReadyMinutes`, `minCalories`, `maxCalories`, `minProteinG`, `maxCarbsG`, `pantryOnlyMode`, `sortOrder`.
 
-All support: { "user_id": "firebase_uid_123" }
-```
-
-**Backward compatible** - works without user_id (generic responses)
-
----
-
-## 🧪 Testing
-
-### Quick Test
-```bash
-# Test with user_id (context-aware)
-curl -X POST http://localhost:8000/api/assistant/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message":"What should I cook?","user_id":"test123"}'
-
-# Test without user_id (generic)
-curl -X POST http://localhost:8000/api/assistant/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message":"What should I cook?"}'
-```
-
----
-
-## 💡 Key Benefits
-
-✅ **Personalized** - Knows user preferences and constraints
-✅ **Safe** - Actively avoids allergens
-✅ **Practical** - Uses items actually in pantry
-✅ **Smart** - Acts like a real cooking advisor
-✅ **Fast** - Context loads in <100ms
-✅ **Backward Compatible** - Works without user_id
+### Recipe Ranking Score (0–100)
+| Component | Max Points | Signal |
+|-----------|-----------|--------|
+| Pantry match | 35 | Fraction of ingredients in pantry |
+| Calorie fit | 20 | Proximity to per-meal target |
+| Macro fit | 15 | Protein / carbs / fat vs. targets |
+| Cuisine score | 15 | Binary match vs. selected cuisines |
+| Cooking-mode fit | 10 | Speed, health, servings, etc. |
+| Popularity | 5 | Spoonacular health + popularity scores |
 
 ---
 
-## 🎓 Learning Path
+## Environment Variables
 
-**New to the feature?**
-1. Start with QUICK_REFERENCE.md
-2. Look at RESPONSE_EXAMPLES.md
-3. Read context_aware_assistant.md
+### Backend (`backend/.env`)
 
-**Need to implement it?**
-1. Check INTEGRATION_GUIDE.md
-2. Look at the code examples
-3. Follow the testing checklist
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GEMINI_API_KEY` | ✅ | Google AI Studio key |
+| `FIREBASE_PROJECT_ID` | ✅ | Firebase project ID |
+| `FIREBASE_PRIVATE_KEY` | ✅ | Firebase service account private key |
+| `FIREBASE_CLIENT_EMAIL` | ✅ | Firebase service account email |
+| `SECRET_KEY` | ✅ | 64-char random string for JWT signing |
+| `DEBUG` | ❌ | `true` enables debug logging (default: false) |
+| `FEEDBACK_EMAIL` | ❌ | Gmail address for feedback sending |
+| `FEEDBACK_EMAIL_PASSWORD` | ❌ | Gmail App Password |
+| `FEEDBACK_RECEIVER_EMAIL` | ❌ | Feedback destination (defaults to FEEDBACK_EMAIL) |
 
-**Need technical details?**
-1. Read assistant_context_spec.md
-2. Check the code in backend/app/services/context_builder.py
-3. Review the example in assistant_service_example.dart
+### Mobile (`mobile_app/.env`)
 
----
-
-## ⚠️ Important Notes
-
-### What Changed
-- API now accepts `user_id` parameter
-- Context automatically loaded if user_id provided
-- AI prompts significantly improved
-- Mobile app sends user_id with requests
-
-### What Stayed the Same
-- Existing API still works (backward compatible)
-- Same endpoints, same response format
-- Works fine without user_id (generic responses)
-- No breaking changes
-
-### What's New
-- ContextBuilder service for gathering user data
-- Complete PantryRepository implementation
-- Enhanced AI prompts with context awareness
-- Mobile integration with UserProvider
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SPOONACULAR_API_KEY` | ✅ | Spoonacular API key (free tier: 150 pts/day) |
 
 ---
 
-## 🐛 Troubleshooting
+## Firestore Collections
 
-**Issue: Still getting generic responses**
-→ Check that user_id is being sent in the request
-
-**Issue: Allergies not being respected**
-→ Verify allergies are saved in user profile
-
-**Issue: Wrong pantry items showing**
-→ Confirm items are in correct user's pantry
-
-**Issue: Context not loading**
-→ Check Firebase connection and user exists
-
-See INTEGRATION_GUIDE.md for more troubleshooting
-
----
-
-## 📞 Support
-
-For questions:
-1. Check QUICK_REFERENCE.md for quick answers
-2. Read INTEGRATION_GUIDE.md for implementation help
-3. Review RESPONSE_EXAMPLES.md for examples
-4. Check assistant_context_spec.md for technical details
-
----
-
-## 🎯 Next Steps
-
-### Immediate
-- [ ] Review the documentation
-- [ ] Test the implementation
-- [ ] Update frontend if needed
-
-### Short Term
-- [ ] Deploy to production
-- [ ] Monitor AI response quality
-- [ ] Gather user feedback
-
-### Future
-- [ ] Add cooking history context
-- [ ] Include nutritional goals
-- [ ] Budget-aware suggestions
-- [ ] Seasonal ingredient awareness
-
----
-
-## 📝 Document Status
-
-| Document | Status | Last Updated | Read Time |
-|----------|--------|--------------|-----------|
-| QUICK_REFERENCE.md | ✅ Complete | 2024 | 5 min |
-| INTEGRATION_GUIDE.md | ✅ Complete | 2024 | 20 min |
-| context_aware_assistant.md | ✅ Complete | 2024 | 15 min |
-| assistant_context_spec.md | ✅ Complete | 2024 | 15 min |
-| RESPONSE_EXAMPLES.md | ✅ Complete | 2024 | 15 min |
-
----
-
-**Happy coding! 🍳🤖**
+| Collection | Document ID | Contents |
+|-----------|-------------|----------|
+| `user_profiles/{uid}` | Firebase UID | Full `UserProfileModel` |
+| `pantry_items/{id}` | Item ID | `PantryItem` fields |
+| `meal_plans/{uid}/weeks/{weekKey}` | `YYYY-WW` | `MealPlan` with days and slots |
+| `shopping_lists/{uid}/lists/{id}` | Auto | `ShoppingList` with checked items |
+| `nutrition_logs/{uid}/entries/{id}` | Auto | `NutritionLogEntry` per cooked meal |
+| `recipe_history/{uid}/cooked/{recipeId}` | Spoonacular ID | `CookedRecipe` with cook count |
+| `saved_recipes/{uid}/items/{recipeId}` | Spoonacular ID | `SavedRecipe` snapshot |
