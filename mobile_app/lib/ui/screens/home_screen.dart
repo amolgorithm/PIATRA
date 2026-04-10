@@ -1,13 +1,11 @@
-// lib/ui/screens/home_screen.dart  (updated)
-// Changes: Analytics card → /analytics, new Meal Plan card → /meal-plan,
-// Feedback card remains. Grid is now 4 rows of 2.
-
+// lib/ui/screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../routes/app_routes.dart';
 import '../../core/constants/theme/app_theme.dart';
 import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
+import '../widgets/overview_fab.dart';
 import '../widgets/soda_background_painter.dart';
 import '../../state/user_provider.dart';
 import '../../state/recipe_provider.dart';
@@ -124,6 +122,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
           ),
           const ThemeToggleFAB(),
+          OverviewFAB(
+            pantryCount: _pantryCount,
+            recipesCount: _recipesCount,
+            overviewLoaded: _overviewLoaded,
+          ),
           const AIAssistantFAB(),
         ],
       ),
@@ -251,80 +254,95 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildFeatureGrid(BuildContext context, bool isDark) {
+    // 6 cards in a 3×2 grid — each row is a plain Row with two Expanded cards.
+    // Using plain Row + Expanded (no IntrinsicHeight) ensures the hit-test area
+    // covers the full card, fixing taps that previously missed near edges.
+    final cards = [
+      _GlassFeatureCard(
+        delay: 0,
+        icon: Icons.kitchen_rounded,
+        title: 'My Pantry',
+        description: 'Manage ingredients',
+        accentColor: const Color(0xFF6C63FF),
+        onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
+        parentAnim: _gridCtrl,
+      ),
+      _GlassFeatureCard(
+        delay: 80,
+        icon: Icons.camera_alt_rounded,
+        title: 'Scan Items',
+        description: 'Add with camera',
+        accentColor: const Color(0xFF00D4AA),
+        onTap: () => Navigator.pushNamed(context, AppRoutes.scan),
+        parentAnim: _gridCtrl,
+      ),
+      _GlassFeatureCard(
+        delay: 160,
+        icon: Icons.restaurant_rounded,
+        title: 'Recipes',
+        description: 'Find what to cook',
+        accentColor: const Color(0xFFFF6B6B),
+        onTap: () => Navigator.pushNamed(context, AppRoutes.recipes),
+        parentAnim: _gridCtrl,
+      ),
+      _GlassFeatureCard(
+        delay: 240,
+        icon: Icons.auto_graph_rounded,
+        title: 'Analytics',
+        description: 'Nutrition history',
+        accentColor: const Color(0xFFFFB800),
+        onTap: () => Navigator.pushNamed(context, AppRoutes.analytics),
+        parentAnim: _gridCtrl,
+      ),
+      _GlassFeatureCard(
+        delay: 320,
+        icon: Icons.calendar_month_rounded,
+        title: 'Meal Plan',
+        description: 'Plan your week',
+        accentColor: const Color(0xFF4E9FF9),
+        onTap: () => Navigator.pushNamed(context, AppRoutes.mealPlan),
+        parentAnim: _gridCtrl,
+      ),
+      _GlassFeatureCard(
+        delay: 400,
+        icon: Icons.feedback_rounded,
+        title: 'Feedback',
+        description: 'Help us improve',
+        accentColor: const Color(0xFFB24BF3),
+        onTap: () => Navigator.pushNamed(context, AppRoutes.feedback),
+        parentAnim: _gridCtrl,
+      ),
+    ];
+
     return Column(
       children: [
-        _GridRow(children: [
-          _GlassFeatureCard(
-            delay: 0,
-            icon: Icons.kitchen_rounded,
-            title: 'My Pantry',
-            description: 'Manage ingredients',
-            accentColor: const Color(0xFF6C63FF),
-            onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
-            parentAnim: _gridCtrl,
-          ),
-          _GlassFeatureCard(
-            delay: 80,
-            icon: Icons.camera_alt_rounded,
-            title: 'Scan Items',
-            description: 'Add with camera',
-            accentColor: const Color(0xFF00D4AA),
-            onTap: () => Navigator.pushNamed(context, AppRoutes.scan),
-            parentAnim: _gridCtrl,
-          ),
-        ]),
+        _CardRow(left: cards[0], right: cards[1]),
         const SizedBox(height: 14),
-        _GridRow(children: [
-          _GlassFeatureCard(
-            delay: 160,
-            icon: Icons.restaurant_rounded,
-            title: 'Recipes',
-            description: 'Find what to cook',
-            accentColor: const Color(0xFFFF6B6B),
-            onTap: () => Navigator.pushNamed(context, AppRoutes.recipes),
-            parentAnim: _gridCtrl,
-          ),
-          // ── UPDATED: Analytics card now navigates to /analytics ──
-          _GlassFeatureCard(
-            delay: 240,
-            icon: Icons.auto_graph_rounded,
-            title: 'Analytics',
-            description: 'Nutrition history',
-            accentColor: const Color(0xFFFFB800),
-            onTap: () => Navigator.pushNamed(context, AppRoutes.analytics),
-            parentAnim: _gridCtrl,
-          ),
-        ]),
+        _CardRow(left: cards[2], right: cards[3]),
         const SizedBox(height: 14),
-        _GridRow(children: [
-          // ── NEW: Meal Plan card ──
-          _GlassFeatureCard(
-            delay: 320,
-            icon: Icons.calendar_month_rounded,
-            title: 'Meal Plan',
-            description: 'Plan your week',
-            accentColor: const Color(0xFF4E9FF9),
-            onTap: () => Navigator.pushNamed(context, AppRoutes.mealPlan),
-            parentAnim: _gridCtrl,
-          ),
-          _GlassFeatureCard(
-            delay: 400,
-            icon: Icons.feedback_rounded,
-            title: 'Feedback',
-            description: 'Help us improve',
-            accentColor: const Color(0xFFB24BF3),
-            onTap: () => Navigator.pushNamed(context, AppRoutes.feedback),
-            parentAnim: _gridCtrl,
-          ),
-        ]),
-        const SizedBox(height: 14),
-        _LiveOverviewCard(
-          delay: 480,
-          parentAnim: _gridCtrl,
-          pantryCount: _pantryCount,
-          recipesCount: _recipesCount,
-          overviewLoaded: _overviewLoaded,
-        ),
+        _CardRow(left: cards[4], right: cards[5]),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Simple card row — avoids IntrinsicHeight which breaks hit-testing
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CardRow extends StatelessWidget {
+  final Widget left;
+  final Widget right;
+  const _CardRow({required this.left, required this.right});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 14),
+        Expanded(child: right),
       ],
     );
   }
@@ -432,27 +450,6 @@ class _Orb extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Grid row helper
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _GridRow extends StatelessWidget {
-  final List<Widget> children;
-  const _GridRow({required this.children});
-
-  @override
-  Widget build(BuildContext context) => IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(child: children[0]),
-            const SizedBox(width: 14),
-            Expanded(child: children[1]),
-          ],
-        ),
-      );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Frosted-glass feature card
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -524,309 +521,116 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnim,
-      child: SlideTransition(
-        position: _slideAnim,
-        child: AnimatedBuilder(
-          animation: _pressAnim,
-          builder: (_, child) =>
-              Transform.scale(scale: _pressAnim.value, child: child),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: widget.onTap,
-              onTapDown: (_) => _pressCtrl.reverse(),
-              onTapUp: (_) => _pressCtrl.forward(),
-              onTapCancel: () => _pressCtrl.forward(),
-              borderRadius: BorderRadius.circular(22),
-              child: Container(
-                height: 148,
-                decoration: BoxDecoration(
-                  color: widget.accentColor.withOpacity(0.48),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: widget.accentColor.withOpacity(0.65),
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.accentColor.withOpacity(0.30),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(22),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        top: -20,
-                        right: -20,
-                        child: Container(
-                          width: 90,
-                          height: 90,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                widget.accentColor.withOpacity(0.50),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: widget.accentColor.withOpacity(0.50),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: widget.accentColor.withOpacity(0.75),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Icon(widget.icon,
-                                  color: Colors.white, size: 24),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  widget.title,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  widget.description,
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.90),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Live Overview Card — full-width now
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _LiveOverviewCard extends StatefulWidget {
-  final int delay;
-  final AnimationController parentAnim;
-  final int pantryCount;
-  final int recipesCount;
-  final bool overviewLoaded;
-
-  const _LiveOverviewCard({
-    required this.delay,
-    required this.parentAnim,
-    required this.pantryCount,
-    required this.recipesCount,
-    required this.overviewLoaded,
-  });
-
-  @override
-  State<_LiveOverviewCard> createState() => _LiveOverviewCardState();
-}
-
-class _LiveOverviewCardState extends State<_LiveOverviewCard> {
-  late Animation<Offset> _slideAnim;
-  late Animation<double> _fadeAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    final begin = (widget.delay / 1000.0).clamp(0.0, 0.8);
-    final end = (begin + 0.4).clamp(0.0, 1.0);
-    _slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.25),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: widget.parentAnim,
-      curve: Interval(begin, end, curve: Curves.easeOutCubic),
-    ));
-    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
-        parent: widget.parentAnim,
-        curve: Interval(begin, end, curve: Curves.easeOut),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnim,
-      child: SlideTransition(
-        position: _slideAnim,
-        child: Consumer<UserProvider>(
-          builder: (_, up, __) {
-            final calTarget = up.profile?.calorieTarget ?? 2000;
-            final mode = up.profile?.cookingMode;
-
-            return Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+    // GestureDetector is the outermost interactive widget — OUTSIDE all
+    // Transform/FadeTransition/SlideTransition wrappers.  Transform.scale
+    // does not adjust its hit-test bounds, so placing GestureDetector inside
+    // it means the tap area stays at the pre-transform coordinates, which
+    // causes misses on right-column and lower cards.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _pressCtrl.reverse(),
+      onTapUp: (_) {
+        _pressCtrl.forward();
+        widget.onTap();
+      },
+      onTapCancel: () => _pressCtrl.forward(),
+      child: FadeTransition(
+        opacity: _fadeAnim,
+        child: SlideTransition(
+          position: _slideAnim,
+          child: AnimatedBuilder(
+            animation: _pressAnim,
+            builder: (_, child) =>
+                Transform.scale(scale: _pressAnim.value, child: child),
+            child: Container(
+              height: 148,
               decoration: BoxDecoration(
-                color: AppTheme.primaryPurple.withOpacity(0.48),
+                color: widget.accentColor.withOpacity(0.48),
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color: AppTheme.primaryPurple.withOpacity(0.65),
+                  color: widget.accentColor.withOpacity(0.65),
                   width: 1,
-                )
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Text(
-                              'Overview',
-                              style: TextStyle(
-                                fontFamily: 'Sora',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const Spacer(),
-                            if (mode != null)
-                              Text(mode.emoji,
-                                  style: const TextStyle(fontSize: 10)),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            _LiveStatRow(
-                              icon: Icons.inventory_2_rounded,
-                              value: widget.overviewLoaded
-                                  ? '${widget.pantryCount}'
-                                  : '—',
-                              label: 'Pantry',
-                              color: AppTheme.primaryPurple,
-                            ),
-                            const SizedBox(width: 20),
-                            _LiveStatRow(
-                              icon: Icons.restaurant_menu_rounded,
-                              value: widget.overviewLoaded
-                                  ? '${widget.recipesCount}'
-                                  : '—',
-                              label: 'Recipes',
-                              color: AppTheme.secondaryTeal,
-                            ),
-                            const SizedBox(width: 20),
-                            _LiveStatRow(
-                              icon: Icons.local_fire_department_rounded,
-                              value: _formatCalories(calTarget),
-                              label: 'kcal target',
-                              color: AppTheme.accentOrange,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.accentColor.withOpacity(0.30),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  String _formatCalories(int cal) {
-    if (cal >= 1000) return '${(cal / 1000).toStringAsFixed(1)}k';
-    return '$cal';
-  }
-}
-
-class _LiveStatRow extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color color;
-
-  const _LiveStatRow({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.20),
-            borderRadius: BorderRadius.circular(7),
-          ),
-          child: Icon(icon, color: color, size: 14),
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              child: Text(
-                value,
-                key: ValueKey(value),
-                style: const TextStyle(
-                  fontFamily: 'Sora',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: -0.3,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: Stack(
+                  children: [
+                    Positioned(
+                      top: -20,
+                      right: -20,
+                      child: Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              widget.accentColor.withOpacity(0.50),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: widget.accentColor.withOpacity(0.50),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: widget.accentColor.withOpacity(0.75),
+                                width: 1,
+                              ),
+                            ),
+                            child: Icon(widget.icon,
+                                color: Colors.white, size: 24),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                widget.description,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.90),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.white.withOpacity(0.60),
-              ),
-            ),
-          ],
+          ),
         ),
-      ],
+      ),
     );
   }
 }

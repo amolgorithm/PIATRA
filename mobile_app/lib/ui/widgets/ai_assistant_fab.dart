@@ -43,17 +43,14 @@ class _AIAssistantFABState extends State<AIAssistantFAB>
       upperBound: 1.0,
       value: 1.0,
     );
-    // Two staggered pulse rings
     _pulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat();
-    // Header shimmer sweep
     _shimmerCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2200),
     )..repeat();
-    // Close icon spin
     _closeSpinCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -116,41 +113,47 @@ class _AIAssistantFABState extends State<AIAssistantFAB>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // Respect the system nav bar so FABs are never hidden behind it.
     final bottomInset = MediaQuery.of(context).padding.bottom;
     final fabBottom = bottomInset + 16.0;
-    final alignedBottom = fabBottom - 13.0; // match ThemeToggleFAB baseline (52 popup vs 78 outer size)
+    // Align with ThemeToggleFAB baseline
+    final alignedBottom = fabBottom - 13.0;
 
+    // IMPORTANT: All children are Positioned so this Stack has zero intrinsic
+    // size and never blocks touches on widgets below it in the parent Stack.
+    // The backdrop is Positioned.fill but only present when _isExpanded.
     return Stack(
-      alignment: Alignment.bottomRight,
+      clipBehavior: Clip.none,
       children: [
-        // Dim backdrop when panel open
+        // Dim backdrop — only when expanded, dismisses on tap
         if (_isExpanded)
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: _toggle,
-            child: Container(color: Colors.black.withOpacity(0.40)),
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _toggle,
+              child: Container(color: Colors.black.withOpacity(0.40)),
+            ),
           ),
 
-        // Floating panel — sits above the FAB with a fixed gap
-        Positioned(
-          bottom: fabBottom + 72, // FAB height (62) + 10px gap
-          right: 16,
-          child: FadeTransition(
-            opacity: _expandFade,
-            child: SlideTransition(
-              position: _expandSlide,
-              child: ScaleTransition(
-                scale: _expandScale,
-                alignment: Alignment.bottomRight,
-                child: _buildPanel(isDark),
+        // Floating panel
+        if (_isExpanded)
+          Positioned(
+            bottom: fabBottom + 72,
+            left: 16,
+            right: 16,
+            child: FadeTransition(
+              opacity: _expandFade,
+              child: SlideTransition(
+                position: _expandSlide,
+                child: ScaleTransition(
+                  scale: _expandScale,
+                  alignment: Alignment.bottomRight,
+                  child: _buildPanel(isDark),
+                ),
               ),
             ),
           ),
-        ),
 
-        // FAB
+        // FAB button
         Positioned(
           bottom: alignedBottom,
           right: 20,
@@ -316,7 +319,6 @@ class _AIAssistantFABState extends State<AIAssistantFAB>
           ),
           child: Stack(
             children: [
-              // Shimmer sweep
               Positioned.fill(
                 child: OverflowBox(
                   maxWidth: double.infinity,
