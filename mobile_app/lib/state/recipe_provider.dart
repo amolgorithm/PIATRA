@@ -3,8 +3,9 @@
 // Drives all recipe screens. Coordinates:
 //   Spoonacular API  →  RecipeRankingEngine  →  UI
 //
-// Fetch strategy (two passes):
-//   Pass 1 – findByIngredients (pantry-first discovery)
+// Fetch strategy (three passes):
+//   Pass 1 – findByIngredients with up to 20 pantry items (pantry-first discovery).
+//            Run multiple batches if pantry > 20 items so we don't miss matches.
 //   Pass 2 – complexSearch with active diet/cuisine/intolerance params
 //   Pass 3 – if cuisine filter is active AND Pass 1+2 yield no cuisine matches,
 //            run a cuisine-only complexSearch without pantry constraints so
@@ -37,16 +38,12 @@ class RecipeProvider extends ChangeNotifier {
   List<RankedRecipe> _rankedRecipes = [];
   List<RankedRecipe> get rankedRecipes => _rankedRecipes;
 
-  /// Set by the engine: true when top results have poor pantry coverage.
   bool _pantryMatchWarning = false;
   bool get pantryMatchWarning => _pantryMatchWarning;
 
-  /// True when a cuisine filter is active and there are non-cuisine recipes
-  /// at the bottom of the list as "other suggestions".
   bool _hasFallbackSection = false;
   bool get hasFallbackSection => _hasFallbackSection;
 
-  /// Index where the fallback (non-cuisine) section begins.
   int _fallbackStartIndex = 0;
   int get fallbackStartIndex => _fallbackStartIndex;
 
@@ -121,30 +118,64 @@ class RecipeProvider extends ChangeNotifier {
     }
 
     // ── Pass 1: pantry-first discovery ────────────────────────────────────
+    // Run in batches of 20 so large pantries (>20 items) are fully explored.
+    // We cap at 3 batches (60 items) to keep API usage reasonable.
     if (pantryNames.isNotEmpty) {
-      try {
-        final hits = await SpoonacularService.instance.findByIngredients(
-          ingredients: pantryNames,
-          number: 30,
-          ranking: 1,
-        );
-        if (hits.isNotEmpty) {
-          final details = await SpoonacularService.instance
-              .getRecipesBulk(hits.map((r) => r.id).toList());
-          add(details);
+      const batchSize = 20;
+      const maxBatches = 3;
+      final batches = <List<String>>[];
+
+      for (int i = 0; i < pantryNames.length && batches.length < maxBatches; i += batchSize) {
+        batches.add(pantryNames.skip(i).take(batchSize).toList());
+      }
+
+      for (final batch in batches) {
+        try {
+          final hits = await SpoonacularService.instance.findByIngredients(
+            ingredients: batch,
+            number: 30,
+            ranking: 1,
+          );
+          if (hits.isNotEmpty) {
+            final details = await SpoonacularService.instance
+                .getRecipesBulk(hits.map((r) => r.id).toList());
+            add(details);
+          }
+        } catch (e) {
+          debugPrint('[RecipeProvider] pass1 batch error: $e');
         }
-      } catch (e) {
-        debugPrint('[RecipeProvider] pass1 error: $e');
+      }
+
+      // Also run with ranking=2 (minimise missing ingredients) on the first
+      // batch — this surfaces recipes where you already have MOST ingredients.
+      if (pantryNames.length >= 3) {
+        try {
+          final hits2 = await SpoonacularService.instance.findByIngredients(
+            ingredients: pantryNames.take(20).toList(),
+            number: 20,
+            ranking: 2,
+          );
+          if (hits2.isNotEmpty) {
+            final details2 = await SpoonacularService.instance
+                .getRecipesBulk(hits2.map((r) => r.id).toList());
+            add(details2);
+          }
+        } catch (e) {
+          debugPrint('[RecipeProvider] pass1 ranking2 error: $e');
+        }
       }
     }
 
     // ── Pass 2: profile-tailored complexSearch ────────────────────────────
+    // Use up to 10 pantry ingredients (Spoonacular cap) — rotate through
+    // different slices of the pantry to maximise variety.
     try {
+      // Slice A: first 10 items
       add(await SpoonacularService.instance.complexSearch(
         cuisine: _filter.cuisines,
         diet: _filter.diets,
         intolerances: _filter.intolerances,
-        includeIngredients: pantryNames.take(5).toList(),
+        includeIngredients: pantryNames.take(10).toList(),
         maxReadyTime: _filter.maxReadyMinutes,
         maxCalories: _filter.maxCalories,
         minCalories: _filter.minCalories,
@@ -153,13 +184,28 @@ class RecipeProvider extends ChangeNotifier {
         number: 20,
       ));
     } catch (e) {
-      debugPrint('[RecipeProvider] pass2 error: $e');
+      debugPrint('[RecipeProvider] pass2a error: $e');
+    }
+
+    // Slice B: next 10 items (if pantry is large enough)
+    if (pantryNames.length > 10) {
+      try {
+        add(await SpoonacularService.instance.complexSearch(
+          cuisine: _filter.cuisines,
+          diet: _filter.diets,
+          intolerances: _filter.intolerances,
+          includeIngredients: pantryNames.skip(10).take(10).toList(),
+          maxReadyTime: _filter.maxReadyMinutes,
+          maxCalories: _filter.maxCalories,
+          minCalories: _filter.minCalories,
+          number: 15,
+        ));
+      } catch (e) {
+        debugPrint('[RecipeProvider] pass2b error: $e');
+      }
     }
 
     // ── Pass 3: cuisine-only fallback (no pantry constraint) ──────────────
-    // Runs when a cuisine filter is active but Pass 1+2 returned no or very
-    // few recipes that actually match that cuisine. This ensures the user
-    // always sees results in their selected cuisine even if pantry is sparse.
     if (_filter.cuisines.isNotEmpty) {
       final cuisineMatchCount = combined
           .where((r) => r.cuisines
@@ -176,7 +222,6 @@ class RecipeProvider extends ChangeNotifier {
             diet: _filter.diets,
             intolerances: _filter.intolerances,
             number: 15,
-            // No includeIngredients — fetch the best in that cuisine regardless
           ));
         } catch (e) {
           debugPrint('[RecipeProvider] pass3 cuisine fallback error: $e');

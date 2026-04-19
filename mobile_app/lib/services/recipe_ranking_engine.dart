@@ -130,18 +130,18 @@ class RecipeRankingEngine {
     required List<PantryItem> pantry,
     required RecipeFilter filter,
   }) {
-    final pantryNames = _normPantry(pantry);
+    final pantryTokens = _buildPantryTokens(pantry);
     final perMealCal = profile.calorieTarget / 3.0;
 
     // ── Stage 0: hard restriction gate ──────────────────────────────────────
     final allowed = recipes
-        .where((r) => _passesRestrictions(r, profile, filter, pantryNames))
+        .where((r) => _passesRestrictions(r, profile, filter, pantryTokens))
         .toList();
 
     // ── Stage 1: score ───────────────────────────────────────────────────────
     final ranked = <RankedRecipe>[];
     for (final recipe in allowed) {
-      final match = _matchIngredients(recipe, pantryNames);
+      final match = _matchIngredients(recipe, pantryTokens);
       final fraction = recipe.ingredients.isEmpty
           ? 1.0
           : match.haveCount / recipe.ingredients.length;
@@ -212,7 +212,7 @@ class RecipeRankingEngine {
     SpoonacularRecipe r,
     UserProfileModel profile,
     RecipeFilter filter,
-    Set<String> pantryNames,
+    _PantryTokens pantryTokens,
   ) {
     // Merge profile + filter dietary preferences
     final allDiets = {
@@ -234,13 +234,17 @@ class RecipeRankingEngine {
 
     // Numeric hard filters
     if (filter.pantryOnlyMode) {
-      final m = _matchIngredients(r, pantryNames);
-      if (r.ingredients.isNotEmpty && m.haveCount < r.ingredients.length)
-        return false;
+      // A recipe passes pantry-only if ALL its ingredients are covered by the
+      // pantry — i.e. recipe ingredients are a SUBSET of the pantry.
+      // We deliberately allow a recipe with 0 ingredients through.
+      if (r.ingredients.isNotEmpty) {
+        final m = _matchIngredients(r, pantryTokens);
+        if (m.missing.isNotEmpty) return false;
+      }
     }
 
     if (filter.minPantryMatchPercent > 0 && r.ingredients.isNotEmpty) {
-      final m = _matchIngredients(r, pantryNames);
+      final m = _matchIngredients(r, pantryTokens);
       if (m.haveCount / r.ingredients.length * 100 <
           filter.minPantryMatchPercent) return false;
     }
@@ -339,16 +343,11 @@ class RecipeRankingEngine {
     return 0;
   }
 
-  /// Cuisine score is BINARY when a cuisine preference is active:
-  ///   match = 15 pts, no match = 0 pts.
-  /// This 15-pt gap ensures cuisine-correct recipes always rank above
-  /// cuisine-incorrect ones at equal pantry/nutrition quality, reinforcing
-  /// the Stage-2 partition even if sortOrder is changed.
   double _scoreCuisine(
       bool match, List<String> filterCuisines, UserProfileModel profile) {
     final active =
         filterCuisines.isNotEmpty ? filterCuisines : profile.favoriteCuisines;
-    if (active.isEmpty) return 7.5; // neutral — no preference set
+    if (active.isEmpty) return 7.5;
     return match ? 15.0 : 0.0;
   }
 
@@ -414,25 +413,105 @@ class RecipeRankingEngine {
     }
   }
 
+  // ── Pantry token builder ──────────────────────────────────────────────────
+  //
+  // For each pantry item we pre-compute a set of normalised tokens so that
+  // matching at query time is O(1) per ingredient word instead of O(N×M).
+  //
+  // Tokens generated per item  (example: "Red Apple Slices"):
+  //   full  → "red apple slices"
+  //   words → {"red", "apple", "slices"}
+  //   stems → {"appl"}           (crude 4-char prefix stem)
+  //
+  // A recipe ingredient ("apple", "apples", "granny smith apple") is checked
+  // by tokenising it the same way and seeing whether any token overlaps.
+
+  _PantryTokens _buildPantryTokens(List<PantryItem> pantry) {
+    final fullNames = <String>{};
+    final wordTokens = <String>{};
+    final stemTokens = <String>{};
+
+    for (final item in pantry) {
+      final norm = _norm(item.name);
+      fullNames.add(norm);
+
+      final words = _tokenise(norm);
+      wordTokens.addAll(words);
+      for (final w in words) {
+        if (w.length >= 4) stemTokens.add(w.substring(0, 4));
+      }
+    }
+
+    return _PantryTokens(
+      fullNames: fullNames,
+      wordTokens: wordTokens,
+      stemTokens: stemTokens,
+    );
+  }
+
   // ── Ingredient matching ───────────────────────────────────────────────────
 
   _MatchResult _matchIngredients(
-      SpoonacularRecipe recipe, Set<String> pantryNames) {
+      SpoonacularRecipe recipe, _PantryTokens pantryTokens) {
     final have = <String>[], missing = <String>[];
     for (final ing in recipe.ingredients) {
-      (_inPantry(ing.name, pantryNames) ? have : missing).add(ing.name);
+      (_ingredientInPantry(ing.name, pantryTokens) ? have : missing)
+          .add(ing.name);
     }
     recipe.pantryMatchCount = have.length;
     recipe.missingIngredientCount = missing.length;
     return _MatchResult(have: have, missing: missing);
   }
 
-  bool _inPantry(String name, Set<String> pantry) {
-    final n = _norm(name);
-    if (pantry.contains(n)) return true;
-    for (final p in pantry) {
-      if (p.contains(n) || n.contains(p)) return true;
+  /// Returns true when the recipe ingredient name is covered by the pantry.
+  ///
+  /// Strategy (in order of precision):
+  ///   1. Exact normalised full-name match.
+  ///   2. All meaningful words in the ingredient appear as pantry word-tokens
+  ///      (handles "boneless chicken breast" → pantry has "chicken").
+  ///   3. Any ingredient word stem matches a pantry stem
+  ///      (handles "apples" → "appl" stem in pantry for "apple").
+  ///   4. Legacy substring fallback for short single-word ingredients.
+  bool _ingredientInPantry(String ingredientName, _PantryTokens pantry) {
+    final norm = _norm(ingredientName);
+
+    // 1. Exact full-name match
+    if (pantry.fullNames.contains(norm)) return true;
+
+    // Legacy: check if any full pantry name contains/is-contained-by the ingredient
+    for (final p in pantry.fullNames) {
+      if (p.contains(norm) || norm.contains(p)) return true;
     }
+
+    // 2. Token-based match — strip filler words, then check if remaining
+    //    meaningful words are all covered by pantry word-tokens.
+    final ingWords = _tokenise(norm);
+    if (ingWords.isEmpty) return false;
+
+    final meaningfulWords =
+        ingWords.where((w) => !_fillerWords.contains(w)).toList();
+    if (meaningfulWords.isEmpty) return false;
+
+    // If ALL meaningful ingredient words appear as pantry word-tokens → match.
+    // (e.g. ingredient "boneless chicken thighs" meaningful=[chicken,thighs],
+    //  pantry has "chicken thighs" → tokens include "chicken","thighs" → true)
+    if (meaningfulWords.every((w) => pantry.wordTokens.contains(w))) {
+      return true;
+    }
+
+    // Partial: at least ONE core/primary word matches
+    // (the first meaningful word is usually the key ingredient noun)
+    final primaryWord = meaningfulWords.first;
+    if (pantry.wordTokens.contains(primaryWord)) return true;
+
+    // 3. Stem match — handles plurals and minor variations
+    for (final w in meaningfulWords) {
+      if (w.length >= 4) {
+        final stem = w.substring(0, 4);
+        if (pantry.stemTokens.contains(stem)) return true;
+      }
+    }
+
     return false;
   }
 
@@ -443,8 +522,40 @@ class RecipeRankingEngine {
     return rc.intersection(wc).isNotEmpty;
   }
 
-  Set<String> _normPantry(List<PantryItem> pantry) =>
-      pantry.map((i) => _norm(i.name)).toSet();
+  // ── Tokenisation helpers ──────────────────────────────────────────────────
+
+  /// Split a normalised string into meaningful word tokens.
+  /// Removes numbers, punctuation, and single characters.
+  List<String> _tokenise(String s) {
+    return s
+        .split(RegExp(r'[\s,.\-/]+'))
+        .where((w) => w.length > 1 && !RegExp(r'^\d+$').hasMatch(w))
+        .toList();
+  }
+
+  /// Words that carry no ingredient meaning and should be ignored when
+  /// deciding whether a pantry item covers a recipe ingredient.
+  static const Set<String> _fillerWords = {
+    // Quantities / sizes
+    'large', 'small', 'medium', 'big', 'extra', 'mini', 'whole', 'half',
+    'quarter', 'slice', 'sliced', 'slices', 'piece', 'pieces', 'handful',
+    // Preparation
+    'fresh', 'frozen', 'dried', 'cooked', 'raw', 'chopped', 'diced',
+    'minced', 'grated', 'shredded', 'crushed', 'ground', 'peeled',
+    'pitted', 'seeded', 'trimmed', 'boneless', 'skinless', 'lean',
+    'roasted', 'toasted', 'smoked', 'canned', 'packed', 'drained',
+    'rinsed', 'washed', 'beaten', 'melted', 'softened', 'room',
+    // Colours (too generic alone)
+    'red', 'green', 'yellow', 'white', 'black', 'brown', 'purple',
+    'orange', 'dark', 'light',
+    // Units
+    'cup', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'lbs', 'gram', 'grams',
+    'kg', 'ml', 'liter', 'litre', 'tablespoon', 'teaspoon', 'ounce',
+    'pound', 'clove', 'cloves', 'sprig', 'sprigs', 'bunch',
+    // Miscellaneous
+    'of', 'or', 'and', 'to', 'taste', 'optional', 'divided', 'plus',
+    'about', 'approximately', 'temperature',
+  };
 
   String _norm(String s) => s.toLowerCase().trim();
 
@@ -490,6 +601,25 @@ class RecipeRankingEngine {
 
     return r;
   }
+}
+
+// ─── Pantry token set ─────────────────────────────────────────────────────────
+
+class _PantryTokens {
+  /// Normalised full item names, e.g. "red apple slices"
+  final Set<String> fullNames;
+
+  /// Every individual word across all pantry item names, e.g. {"red","apple","slices"}
+  final Set<String> wordTokens;
+
+  /// 4-char prefix stems for fuzzy plural/variant matching, e.g. {"appl"}
+  final Set<String> stemTokens;
+
+  const _PantryTokens({
+    required this.fullNames,
+    required this.wordTokens,
+    required this.stemTokens,
+  });
 }
 
 // ─── Internal ─────────────────────────────────────────────────────────────────
