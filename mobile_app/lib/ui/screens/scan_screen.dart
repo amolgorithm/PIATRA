@@ -6,11 +6,13 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/theme/app_theme.dart';
 import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
+import '../widgets/backend_status_indicator.dart';
 import '../../ml/pantry_scanner.dart';
 import '../../ml/detection_result.dart';
 import '../../models/detected_item.dart';
 import '../../models/pantry_item.dart';
 import '../../services/pantry_sync_manager.dart';
+import '../../services/backend_status_service.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -40,7 +42,7 @@ class _ScanScreenState extends State<ScanScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('⚠️ ML model failed to load: $e'),
+            content: Text('ML model failed to load: $e'),
             backgroundColor: AppTheme.errorRed,
             duration: const Duration(seconds: 6),
           ),
@@ -185,7 +187,7 @@ class _ScanScreenState extends State<ScanScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              '✅ Added ${activeItems.length} item${activeItems.length == 1 ? '' : 's'} to pantry!'),
+              'Added ${activeItems.length} item${activeItems.length == 1 ? '' : 's'} to pantry!'),
           backgroundColor: AppTheme.successGreen,
           duration: const Duration(seconds: 2),
         ),
@@ -238,6 +240,8 @@ class _ScanScreenState extends State<ScanScreen> {
             child: Column(
               children: [
                 _buildAppBar(isDark),
+                // Backend status banner — only shown while waking or offline
+                _BackendStatusBanner(isDark: isDark),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -292,6 +296,8 @@ class _ScanScreenState extends State<ScanScreen> {
               ],
             ),
           ),
+          // Compact dot indicator in top-right of appbar
+          const BackendStatusDot(),
         ],
       ),
     );
@@ -399,36 +405,55 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 
   Widget _buildReviewControls() {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _isProcessing ? null : _retake,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Retake'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
+    // Disable "Identify Food" if backend is offline — show tooltip instead
+    return StreamBuilder<BackendStatus>(
+      stream: BackendStatusService.instance.statusStream,
+      initialData: BackendStatusService.instance.currentStatus,
+      builder: (context, snap) {
+        final status = snap.data ?? BackendStatus.idle;
+        final isOffline = status == BackendStatus.offline;
+
+        return Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _isProcessing ? null : _retake,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Retake'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: ElevatedButton.icon(
-            onPressed: _isProcessing ? null : _processImage,
-            icon: _isProcessing
-                ? const SizedBox(
-                    width: 16, height: 16,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.auto_awesome_rounded),
-            label: Text(_isProcessing ? 'Detecting…' : 'Identify Food'),
-            style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16)),
-          ),
-        ),
-      ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Tooltip(
+                message: isOffline ? 'Server offline — tap indicator to retry' : '',
+                child: ElevatedButton.icon(
+                  onPressed: (_isProcessing || isOffline) ? null : _processImage,
+                  icon: _isProcessing
+                      ? const SizedBox(
+                          width: 16, height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : isOffline
+                          ? const Icon(Icons.cloud_off_rounded)
+                          : const Icon(Icons.auto_awesome_rounded),
+                  label: Text(_isProcessing
+                      ? 'Detecting…'
+                      : isOffline
+                          ? 'Server offline'
+                          : 'Identify Food'),
+                  style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16)),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -453,8 +478,80 @@ class _ScanScreenState extends State<ScanScreen> {
       .showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppTheme.warningYellow));
 }
 
+// ─── Backend status banner (inline, not a snackbar) ───────────────────────────
+
+class _BackendStatusBanner extends StatelessWidget {
+  final bool isDark;
+  const _BackendStatusBanner({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<BackendStatus>(
+      stream: BackendStatusService.instance.statusStream,
+      initialData: BackendStatusService.instance.currentStatus,
+      builder: (context, snap) {
+        final status = snap.data ?? BackendStatus.idle;
+
+        if (status == BackendStatus.online || status == BackendStatus.idle) {
+          return const SizedBox.shrink();
+        }
+
+        final isWaking = status == BackendStatus.waking;
+        final color = isWaking ? AppTheme.warningYellow : AppTheme.errorRed;
+        final icon  = isWaking ? Icons.cloud_sync_rounded : Icons.cloud_off_rounded;
+        final msg   = isWaking
+            ? 'AI scan server waking up — identification may take ~30s on first use'
+            : 'AI scan server offline — tap to retry';
+
+        return GestureDetector(
+          onTap: isWaking ? null : BackendStatusService.instance.retry,
+          child: Container(
+            width: double.infinity,
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(isDark ? 0.13 : 0.09),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: color.withOpacity(0.30)),
+            ),
+            child: Row(
+              children: [
+                if (isWaking)
+                  SizedBox(
+                    width: 13, height: 13,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.8,
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                    ),
+                  )
+                else
+                  Icon(icon, size: 15, color: color),
+                const SizedBox(width: 8),
+                Icon(icon, size: 13, color: color),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    msg,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: color,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (!isWaking)
+                  Icon(Icons.refresh_rounded, size: 14, color: color),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Detection Results Sheet
+// Detection Results Sheet (unchanged from original)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _DetectionResultsSheet extends StatefulWidget {
@@ -559,7 +656,6 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
       ),
       child: Column(
         children: [
-          // Handle bar
           Container(
             margin: const EdgeInsets.only(top: 12, bottom: 8),
             width: 40, height: 4,
@@ -567,7 +663,6 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
                 color: Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2)),
           ),
-          // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Row(
@@ -601,7 +696,6 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
               ],
             ),
           ),
-          // Warning for low confidence items
           if (active.any((i) => i.confidenceLevel == ConfidenceLevel.low))
             Container(
               margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -628,7 +722,6 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
                 ],
               ),
             ),
-          // List
           Expanded(
             child: active.isEmpty
                 ? Center(
@@ -653,7 +746,6 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
                     ),
                   ),
           ),
-          // Bottom bar
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -694,10 +786,6 @@ class _DetectionResultsSheetState extends State<_DetectionResultsSheet> {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Individual item card
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _DetectedItemCard extends StatelessWidget {
   final DetectedItem item;
@@ -741,7 +829,6 @@ class _DetectedItemCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            // Confidence circle
             Container(
               width: 48, height: 48,
               decoration: BoxDecoration(
@@ -750,7 +837,6 @@ class _DetectedItemCard extends StatelessWidget {
               child: Icon(indicatorIcon, color: indicatorColor, size: 24),
             ),
             const SizedBox(width: 12),
-            // Name + meta
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -814,7 +900,6 @@ class _DetectedItemCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Actions
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [

@@ -1,3 +1,4 @@
+// lib/ui/screens/assistant_screen.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -7,6 +8,8 @@ import '../../state/user_provider.dart';
 import '../../services/pantry_service.dart';
 import '../../models/user_profile_model.dart';
 import '../../core/config/app_config.dart';
+import '../../services/backend_status_service.dart';
+import '../widgets/backend_status_indicator.dart';
 
 class AssistantScreen extends StatefulWidget {
   const AssistantScreen({super.key});
@@ -44,20 +47,11 @@ class _AssistantScreenState extends State<AssistantScreen>
     );
     _inputScale = _inputCtrl;
 
-    _warmUpBackend();
     _messages.add(ChatMessage(
       text: "Hi! I'm PIATRA, your cooking assistant. I can see your pantry and cooking profile automatically. Ask me what you can cook, get nutrition advice, or anything food-related!",
       isUser: false,
       timestamp: DateTime.now(),
     ));
-  }
-
-  Future<void> _warmUpBackend() async {
-    try {
-      await http
-          .get(Uri.parse('${AppConfig.baseUrl}/health'))
-          .timeout(const Duration(seconds: 60));
-    } catch (_) {}
   }
 
   @override
@@ -121,6 +115,8 @@ class _AssistantScreenState extends State<AssistantScreen>
     final text = (prefill ?? _messageController.text).trim();
     if (text.isEmpty || _isLoading) return;
 
+    // If backend is still waking, show a brief hint but still attempt the call
+    // (the backend may have just come online or the ping may be lagging).
     setState(() {
       _messages.add(ChatMessage(text: text, isUser: true, timestamp: DateTime.now()));
       _isLoading = true;
@@ -162,7 +158,7 @@ class _AssistantScreenState extends State<AssistantScreen>
               'user_id': '',
             }),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -267,22 +263,9 @@ class _AssistantScreenState extends State<AssistantScreen>
                       fontWeight: FontWeight.w700,
                       color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
                     )),
-                Row(
-                  children: [
-                    Container(
-                      width: 7, height: 7,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.successGreen, shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text('Online',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppTheme.successGreen.withOpacity(0.9),
-                        )),
-                  ],
-                ),
+                // Backend status shown inline below the title
+                const SizedBox(height: 3),
+                const BackendStatusIndicator(),
               ],
             ),
           ),
@@ -455,93 +438,140 @@ class _AssistantScreenState extends State<AssistantScreen>
   }
 
   Widget _buildInputArea(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.surfaceDark : Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: isDark ? const Color(0x18FFFFFF) : const Color(0x10000000),
-          ),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
+    // Check backend status to decide whether to show a send-blocking banner
+    return StreamBuilder<BackendStatus>(
+      stream: BackendStatusService.instance.statusStream,
+      initialData: BackendStatusService.instance.currentStatus,
+      builder: (context, snap) {
+        final status = snap.data ?? BackendStatus.idle;
+        final isWaking = status == BackendStatus.waking;
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.cardDark : const Color(0xFFF4F3FF),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
+            // Subtle banner only while waking — reminds user AI may be slow
+            if (isWaking)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 7),
+                color: AppTheme.warningYellow.withOpacity(isDark ? 0.12 : 0.08),
+                child: Row(
+                  children: [
+                    const SizedBox(
+                      width: 12, height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.8,
+                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.warningYellow),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.cloud_sync_rounded, size: 13, color: AppTheme.warningYellow),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Server is waking up — first response may take ~30s',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.warningYellow,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.surfaceDark : Colors.white,
+                border: Border(
+                  top: BorderSide(
                     color: isDark ? const Color(0x18FFFFFF) : const Color(0x10000000),
                   ),
                 ),
-                child: TextField(
-                  controller: _messageController,
-                  enabled: !_isLoading,
-                  decoration: InputDecoration(
-                    hintText: 'Ask about cooking...',
-                    border: InputBorder.none,
-                    filled: false,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    hintStyle: TextStyle(
-                      color: isDark
-                          ? AppTheme.textSecondaryDark
-                          : AppTheme.textSecondaryLight,
-                    ),
-                  ),
-                  maxLines: null,
-                  textCapitalization: TextCapitalization.sentences,
-                  onSubmitted: (_) => _sendMessage(),
-                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            AnimatedBuilder(
-              animation: _inputScale,
-              builder: (_, child) => Transform.scale(
-                scale: _inputScale.value,
-                child: child,
-              ),
-              child: GestureDetector(
-                onTapDown: (_) => _inputCtrl.reverse(),
-                onTapUp: (_) {
-                  _inputCtrl.forward();
-                  _sendMessage();
-                },
-                onTapCancel: () => _inputCtrl.forward(),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: _isLoading
-                        ? LinearGradient(colors: [
-                            Colors.grey.shade600,
-                            Colors.grey.shade700
-                          ])
-                        : AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: _isLoading
-                        ? []
-                        : [
-                            BoxShadow(
-                              color: AppTheme.primaryPurple.withOpacity(0.45),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
+              child: SafeArea(
+                top: false,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isDark ? AppTheme.cardDark : const Color(0xFFF4F3FF),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isDark ? const Color(0x18FFFFFF) : const Color(0x10000000),
+                          ),
+                        ),
+                        child: TextField(
+                          controller: _messageController,
+                          enabled: !_isLoading,
+                          decoration: InputDecoration(
+                            hintText: isWaking
+                                ? 'Type your message (server waking up…)'
+                                : 'Ask about cooking…',
+                            border: InputBorder.none,
+                            filled: false,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            hintStyle: TextStyle(
+                              color: isDark
+                                  ? AppTheme.textSecondaryDark
+                                  : AppTheme.textSecondaryLight,
                             ),
-                          ],
-                  ),
-                  child: const Icon(Icons.send_rounded,
-                      color: Colors.white, size: 20),
+                          ),
+                          maxLines: null,
+                          textCapitalization: TextCapitalization.sentences,
+                          onSubmitted: (_) => _sendMessage(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    AnimatedBuilder(
+                      animation: _inputScale,
+                      builder: (_, child) => Transform.scale(
+                        scale: _inputScale.value,
+                        child: child,
+                      ),
+                      child: GestureDetector(
+                        onTapDown: (_) => _inputCtrl.reverse(),
+                        onTapUp: (_) {
+                          _inputCtrl.forward();
+                          _sendMessage();
+                        },
+                        onTapCancel: () => _inputCtrl.forward(),
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: _isLoading
+                                ? LinearGradient(colors: [
+                                    Colors.grey.shade600,
+                                    Colors.grey.shade700
+                                  ])
+                                : AppTheme.primaryGradient,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: _isLoading
+                                ? []
+                                : [
+                                    BoxShadow(
+                                      color: AppTheme.primaryPurple.withOpacity(0.45),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                          ),
+                          child: const Icon(Icons.send_rounded,
+                              color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 }
