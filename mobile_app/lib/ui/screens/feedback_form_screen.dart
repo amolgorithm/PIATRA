@@ -88,7 +88,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
 
     final payload = {
       'feedback':
-          '[${_selectedCategory.label}]${_rating > 0 ? ' [${'⭐' * _rating}]' : ''} $feedbackText',
+          '[${_selectedCategory.label}]${_rating > 0 ? ' [${_ratingStars(_rating)}]' : ''} $feedbackText',
       'user_id': '',
     };
 
@@ -116,6 +116,8 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
       if (mounted && !_submitted) setState(() => _isSubmitting = false);
     }
   }
+
+  String _ratingStars(int r) => List.filled(r, '*').join();
 
   void _showError(String msg) {
     if (!mounted) return;
@@ -151,7 +153,6 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // Ambient background
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -163,7 +164,6 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
               ),
             ),
           ),
-          // Decorative orb
           Positioned(
             top: -50,
             right: -60,
@@ -187,8 +187,6 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
       ),
     );
   }
-
-  // ── Success view ────────────────────────────────────────────────────────────
 
   Widget _buildSuccessView(bool isDark) {
     return FadeTransition(
@@ -224,7 +222,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
                 ),
                 const SizedBox(height: 32),
                 Text(
-                  'Thank you! 🎉',
+                  'Thank you!',
                   style: TextStyle(
                     fontFamily: 'Sora',
                     fontSize: 30,
@@ -286,8 +284,6 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
     );
   }
 
-  // ── Form ────────────────────────────────────────────────────────────────────
-
   Widget _buildForm(bool isDark) {
     return FadeTransition(
       opacity: _entranceFade,
@@ -301,25 +297,21 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  // Category picker
                   _sectionLabel('What is your feedback about?', isDark),
                   const SizedBox(height: 12),
                   _buildCategoryGrid(isDark),
                   const SizedBox(height: 24),
 
-                  // Star rating
                   _sectionLabel('How would you rate your experience?', isDark),
                   const SizedBox(height: 12),
                   _buildStarRating(isDark),
                   const SizedBox(height: 24),
 
-                  // Text field
                   _sectionLabel('Tell us more', isDark),
                   const SizedBox(height: 12),
                   _buildTextField(isDark),
                   const SizedBox(height: 32),
 
-                  // Submit button
                   _buildSubmitButton(isDark),
                 ]),
               ),
@@ -336,7 +328,6 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Back + header row
           Row(
             children: [
               GestureDetector(
@@ -380,7 +371,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
                     ),
                   ],
                 ),
-                child: const Icon(Icons.feedback_rounded,
+                child: const Icon(Icons.rate_review_rounded,
                     color: Colors.white, size: 20),
               ),
             ],
@@ -473,8 +464,9 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(cat.emoji,
-                    style: const TextStyle(fontSize: 16)),
+                Icon(cat.icon,
+                    size: 16,
+                    color: selected ? Colors.white : const Color(0xFFB24BF3)),
                 const SizedBox(width: 8),
                 Text(
                   cat.label,
@@ -539,7 +531,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
             const SizedBox(height: 8),
             Text(
               _ratingLabel(_rating),
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: AppTheme.warningYellow,
@@ -553,11 +545,11 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
 
   String _ratingLabel(int r) {
     switch (r) {
-      case 1: return '😢  Needs a lot of work';
-      case 2: return '😕  Could be better';
-      case 3: return '😊  Pretty good';
-      case 4: return '😄  Really enjoying it';
-      case 5: return '🤩  Absolutely love it!';
+      case 1: return 'Needs a lot of work';
+      case 2: return 'Could be better';
+      case 3: return 'Pretty good';
+      case 4: return 'Really enjoying it';
+      case 5: return 'Absolutely love it!';
       default: return '';
     }
   }
@@ -604,7 +596,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 hintText:
-                    'Describe your experience, report a bug, suggest a feature, or just say hi…',
+                    'Describe your experience, report a bug, suggest a feature, or just say hi...',
                 hintMaxLines: 3,
                 border: InputBorder.none,
                 filled: false,
@@ -680,8 +672,6 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
   }
 }
 
-// ── Category enum ─────────────────────────────────────────────────────────────
-
 enum _FeedbackCategory {
   general,
   bug,
@@ -699,18 +689,18 @@ extension _FeedbackCategoryExt on _FeedbackCategory {
       case _FeedbackCategory.feature:  return 'Feature Request';
       case _FeedbackCategory.recipes:  return 'Recipes';
       case _FeedbackCategory.pantry:   return 'Pantry';
-      case _FeedbackCategory.ai:       return 'AI Assistant';
+      case _FeedbackCategory.ai:       return 'Assistant';
     }
   }
 
-  String get emoji {
+  IconData get icon {
     switch (this) {
-      case _FeedbackCategory.general:  return '💬';
-      case _FeedbackCategory.bug:      return '🐛';
-      case _FeedbackCategory.feature:  return '✨';
-      case _FeedbackCategory.recipes:  return '🍳';
-      case _FeedbackCategory.pantry:   return '🧺';
-      case _FeedbackCategory.ai:       return '🤖';
+      case _FeedbackCategory.general:  return Icons.chat_bubble_outline_rounded;
+      case _FeedbackCategory.bug:      return Icons.bug_report_outlined;
+      case _FeedbackCategory.feature:  return Icons.add_circle_outline_rounded;
+      case _FeedbackCategory.recipes:  return Icons.restaurant_outlined;
+      case _FeedbackCategory.pantry:   return Icons.kitchen_outlined;
+      case _FeedbackCategory.ai:       return Icons.auto_awesome_outlined;
     }
   }
 }

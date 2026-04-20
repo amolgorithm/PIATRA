@@ -393,7 +393,7 @@ class _MealSlotCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
             child: Row(
               children: [
-                Text(slot.emoji, style: const TextStyle(fontSize: 18)),
+                Icon(slot.slotIcon, size: 18, color: AppTheme.primaryPurple),
                 const SizedBox(width: 8),
                 Text(slot.label,
                     style: const TextStyle(

@@ -236,24 +236,24 @@ class _FilterBar extends StatelessWidget {
 
         if (f.pantryOnlyMode) {
           chips.add(_ActiveChip(
-              label: '🧺 Pantry only',
+              label: 'Pantry only',
               onRemove: () =>
                   p.applyFilter(f.copyWith(pantryOnlyMode: false))));
         }
         if (f.maxReadyMinutes != null) {
           chips.add(_ActiveChip(
-              label: '⏱ ≤${f.maxReadyMinutes}m',
+              label: '≤${f.maxReadyMinutes}m',
               onRemove: () =>
                   p.applyFilter(f.copyWith(clearMaxReadyMinutes: true))));
         }
         if (f.maxCalories != null) {
           chips.add(_ActiveChip(
-              label: '🔥 ≤${f.maxCalories} cal',
+              label: '≤${f.maxCalories} cal',
               onRemove: () => p.applyFilter(f.copyWith(maxCalories: null))));
         }
         for (final c in f.cuisines) {
           chips.add(_ActiveChip(
-              label: '🍴 $c',
+              label: '$c',
               onRemove: () => p.applyFilter(f.copyWith(
                   cuisines:
                       f.cuisines.where((x) => x != c).toList()))));

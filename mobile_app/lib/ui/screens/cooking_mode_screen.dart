@@ -251,7 +251,7 @@ class _CookingModeScreenState extends State<CookingModeScreen>
 
   Future<void> _aiGreet() async {
     final r = widget.ranked.recipe;
-    final greeting = "Let's cook **${r.title}**! 🍳\n\n"
+    final greeting = "Let's cook **${r.title}**!\n\n"
         "I'm with you for every step. We're starting with Step 1:\n\n"
         "_${_steps.first.step}_\n\n"
         "Ask me anything — substitutions, techniques, timings, or just say 'next tip'!";

@@ -10,6 +10,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'spoonacular_service.dart';
 
@@ -26,12 +27,12 @@ extension MealSlotLabel on MealSlot {
       case MealSlot.snack:     return 'Snack';
     }
   }
-  String get emoji {
+  IconData get slotIcon {
     switch (this) {
-      case MealSlot.breakfast: return '🌅';
-      case MealSlot.lunch:     return '☀️';
-      case MealSlot.dinner:    return '🌙';
-      case MealSlot.snack:     return '🍎';
+      case MealSlot.breakfast: return Icons.wb_twilight_rounded;
+      case MealSlot.lunch:     return Icons.wb_sunny_outlined;
+      case MealSlot.dinner:    return Icons.nightlight_outlined;
+      case MealSlot.snack:     return Icons.apple_rounded;  // or Icons.local_dining_rounded
     }
   }
   int get order {

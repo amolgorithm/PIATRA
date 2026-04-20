@@ -161,7 +161,7 @@ class _ShoppingListScreenState extends State<ShoppingListScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      progress >= 1.0 ? '🎉 All done!' : '$checked of $total items',
+                      progress >= 1.0 ? 'All done!' : '$checked of $total items',
                       style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,

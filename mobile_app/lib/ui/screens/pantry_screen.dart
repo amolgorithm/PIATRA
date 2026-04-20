@@ -429,17 +429,17 @@ class _PantryScreenState extends State<PantryScreen>
                   decoration: const InputDecoration(labelText: 'Category'),
                   items: const [
                     DropdownMenuItem(
-                        value: 'Vegetables', child: Text('🥦 Vegetables')),
-                    DropdownMenuItem(value: 'Fruits', child: Text('🍎 Fruits')),
-                    DropdownMenuItem(value: 'Dairy', child: Text('🥛 Dairy')),
-                    DropdownMenuItem(value: 'Meat', child: Text('🥩 Meat')),
+                        value: 'Vegetables', child: Text('Vegetables')),
+                    DropdownMenuItem(value: 'Fruits', child: Text('Fruits')),
+                    DropdownMenuItem(value: 'Dairy', child: Text('Dairy')),
+                    DropdownMenuItem(value: 'Meat', child: Text('Meat')),
                     DropdownMenuItem(
                         value: 'Grains & Legumes',
-                        child: Text('🌾 Grains & Legumes')),
+                        child: Text('Grains & Legumes')),
                     DropdownMenuItem(
-                        value: 'Beverages', child: Text('🧃 Beverages')),
-                    DropdownMenuItem(value: 'Bakery', child: Text('🍞 Bakery')),
-                    DropdownMenuItem(value: 'Other', child: Text('📦 Other')),
+                        value: 'Beverages', child: Text('Beverages')),
+                    DropdownMenuItem(value: 'Bakery', child: Text('Bakery')),
+                    DropdownMenuItem(value: 'Other', child: Text('Other')),
                   ],
                   onChanged: (v) => setS(() => cat = v ?? 'Other'),
                 ),

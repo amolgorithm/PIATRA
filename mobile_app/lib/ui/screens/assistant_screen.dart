@@ -27,11 +27,11 @@ class _AssistantScreenState extends State<AssistantScreen>
 
   static String get _backendUrl => AppConfig.assistantChatUrl;
 
-  static const List<String> _suggestions = [
-    '🍳 What can I cook tonight?',
-    '🥗 Healthy meal ideas',
-    '⏱ Quick 20-min recipes',
-    '🛒 What am I missing?',
+  static const List<Map<String, dynamic>> _suggestions = [
+    {'icon': Icons.dinner_dining_rounded, 'label': 'What can I cook tonight?'},
+    {'icon': Icons.eco_rounded,           'label': 'Healthy meal ideas'},
+    {'icon': Icons.timer_rounded,         'label': 'Quick 20-min recipes'},
+    {'icon': Icons.shopping_cart_rounded, 'label': 'What am I missing?'},
   ];
 
   @override
@@ -46,7 +46,7 @@ class _AssistantScreenState extends State<AssistantScreen>
 
     _warmUpBackend();
     _messages.add(ChatMessage(
-      text: "Hi! I'm PIATRA, your AI cooking assistant. I can see your pantry and cooking profile automatically — ask me what you can cook, get nutrition advice, or anything food-related!",
+      text: "Hi! I'm PIATRA, your cooking assistant. I can see your pantry and cooking profile automatically. Ask me what you can cook, get nutrition advice, or anything food-related!",
       isUser: false,
       timestamp: DateTime.now(),
     ));
@@ -83,7 +83,7 @@ class _AssistantScreenState extends State<AssistantScreen>
   Future<String> _buildPantryContext() async {
     try {
       final items = await PantryService.instance.getAllItems();
-      if (items.isEmpty) return 'Pantry: empty — no items recorded yet.';
+      if (items.isEmpty) return 'Pantry: empty, no items recorded yet.';
       final buf = StringBuffer('Pantry items (${items.length} total):\n');
       for (final item in items) {
         buf.write('- ${item.name}: ${item.quantity}');
@@ -98,7 +98,7 @@ class _AssistantScreenState extends State<AssistantScreen>
       }
       return buf.toString().trimRight();
     } catch (e) {
-      return 'Pantry: could not load — $e';
+      return 'Pantry: could not load ($e)';
     }
   }
 
@@ -181,7 +181,6 @@ class _AssistantScreenState extends State<AssistantScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // Ambient bg
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -357,8 +356,8 @@ class _AssistantScreenState extends State<AssistantScreen>
                     const Icon(Icons.auto_awesome_rounded,
                         size: 11, color: AppTheme.primaryPurple),
                     const SizedBox(width: 4),
-                    Text('PIATRA',
-                        style: const TextStyle(
+                    const Text('PIATRA',
+                        style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           color: AppTheme.primaryPurple,
@@ -423,9 +422,9 @@ class _AssistantScreenState extends State<AssistantScreen>
         spacing: 8,
         runSpacing: 8,
         children: _suggestions.map((s) => GestureDetector(
-          onTap: () => _sendMessage(s),
+          onTap: () => _sendMessage(s['label'] as String),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
               color: AppTheme.primaryPurple.withOpacity(isDark ? 0.15 : 0.08),
               borderRadius: BorderRadius.circular(20),
@@ -433,13 +432,21 @@ class _AssistantScreenState extends State<AssistantScreen>
                 color: AppTheme.primaryPurple.withOpacity(0.3),
               ),
             ),
-            child: Text(
-              s,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppTheme.primaryPurple,
-                fontWeight: FontWeight.w500,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(s['icon'] as IconData,
+                    size: 14, color: AppTheme.primaryPurple),
+                const SizedBox(width: 6),
+                Text(
+                  s['label'] as String,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.primaryPurple,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
         )).toList(),
@@ -475,7 +482,7 @@ class _AssistantScreenState extends State<AssistantScreen>
                   controller: _messageController,
                   enabled: !_isLoading,
                   decoration: InputDecoration(
-                    hintText: 'Ask about cooking…',
+                    hintText: 'Ask about cooking...',
                     border: InputBorder.none,
                     filled: false,
                     contentPadding: const EdgeInsets.symmetric(
@@ -538,8 +545,6 @@ class _AssistantScreenState extends State<AssistantScreen>
     );
   }
 }
-
-// ── Dot animation ─────────────────────────────────────────────────────────────
 
 class _DotAnim extends StatefulWidget {
   final Color color;

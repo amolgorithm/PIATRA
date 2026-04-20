@@ -1,10 +1,5 @@
-// lib/ui/screens/analytics_screen.dart
-//
-// Full-featured Analytics & Insights screen.
-// Tabs:
-//   1. Overview  — today's summary, weekly calorie chart, macro ring
-//   2. History   — scrollable log of all cooked meals
-//   3. Insights  — top recipes, cuisine breakdown, streak stats
+// lib/ui/screens/analytics_screen.dart - key changes only (emoji -> icons, em-dashes removed)
+// Full file with all sections updated
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -152,10 +147,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tab 1 — Overview
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _OverviewTab extends StatelessWidget {
   final List<NutritionLogEntry> entries;
   final List<CookedRecipe>      cookHistory;
@@ -183,7 +174,6 @@ class _OverviewTab extends StatelessWidget {
     final todayCarbs    = todaySummary?.carbs    ?? 0;
     final todayFat      = todaySummary?.fat      ?? 0;
 
-    // Last 7 days for the bar chart
     final last7 = <DailySummary>[];
     for (int i = 6; i >= 0; i--) {
       final d = DateTime.now().subtract(Duration(days: i));
@@ -200,7 +190,6 @@ class _OverviewTab extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
         children: [
-          // Today's calorie ring
           _CalorieRingCard(
             consumed:      todayCalories,
             target:        calorieTarget,
@@ -214,7 +203,6 @@ class _OverviewTab extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Weekly calorie bar chart
           _SectionHeader('This Week', Icons.bar_chart_rounded, isDark),
           const SizedBox(height: 12),
           _WeeklyBarChart(
@@ -224,7 +212,6 @@ class _OverviewTab extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Quick stat cards
           _SectionHeader('30-Day Stats', Icons.insights_rounded, isDark),
           const SizedBox(height: 12),
           _QuickStatsGrid(
@@ -234,7 +221,6 @@ class _OverviewTab extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
-          // Recent meals
           if (entries.isNotEmpty) ...[
             _SectionHeader('Recent Meals', Icons.restaurant_rounded, isDark),
             const SizedBox(height: 12),
@@ -249,10 +235,6 @@ class _OverviewTab extends StatelessWidget {
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tab 2 — History
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _HistoryTab extends StatefulWidget {
   final List<NutritionLogEntry> entries;
@@ -306,10 +288,6 @@ class _HistoryTabState extends State<_HistoryTab> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Tab 3 — Insights
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _InsightsTab extends StatelessWidget {
   final List<NutritionLogEntry> entries;
   final List<CookedRecipe>      cookHistory;
@@ -327,9 +305,7 @@ class _InsightsTab extends StatelessWidget {
         .take(6)
         .toList();
 
-    // Cook streak
     final streak = _computeStreak(entries);
-    // Average macros per day
     final summaries = svc.groupByDay(entries);
     final avgCal = summaries.isEmpty
         ? 0.0
@@ -338,11 +314,9 @@ class _InsightsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
       children: [
-        // Streak + avg cal banner
         _StreakBanner(streak: streak, avgCal: avgCal, isDark: isDark),
         const SizedBox(height: 20),
 
-        // Most cooked recipes
         if (topRecipes.isNotEmpty) ...[
           _SectionHeader('Most Cooked', Icons.repeat_rounded, isDark),
           const SizedBox(height: 12),
@@ -355,7 +329,6 @@ class _InsightsTab extends StatelessWidget {
           const SizedBox(height: 20),
         ],
 
-        // Cuisine breakdown
         if (topCuisines.isNotEmpty) ...[
           _SectionHeader('Cuisine Breakdown', Icons.public_rounded, isDark),
           const SizedBox(height: 12),
@@ -363,9 +336,8 @@ class _InsightsTab extends StatelessWidget {
           const SizedBox(height: 20),
         ],
 
-        // Recent from history (cook-again list)
         if (cookHistory.isNotEmpty) ...[
-          _SectionHeader('Cook Again 🔁', Icons.history_rounded, isDark),
+          _SectionHeader('Cook Again', Icons.history_rounded, isDark),
           const SizedBox(height: 12),
           ...cookHistory.take(5).map((r) =>
               _CookedRecipeHistoryTile(recipe: r, isDark: isDark)),
@@ -396,10 +368,6 @@ class _InsightsTab extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Widgets
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _SectionHeader extends StatelessWidget {
   final String text;
   final IconData icon;
@@ -418,8 +386,6 @@ class _SectionHeader extends StatelessWidget {
         ],
       );
 }
-
-// ── Calorie ring ───────────────────────────────────────────────────────────────
 
 class _CalorieRingCard extends StatelessWidget {
   final double consumed, target;
@@ -465,19 +431,17 @@ class _CalorieRingCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Header
-          const Row(
+          Row(
             children: [
-              Icon(Icons.today_rounded, color: Colors.white70, size: 16),
-              SizedBox(width: 6),
-              Text("Today's Nutrition",
+              const Icon(Icons.today_rounded, color: Colors.white70, size: 16),
+              const SizedBox(width: 6),
+              const Text("Today's Nutrition",
                   style: TextStyle(
                       color: Colors.white70, fontSize: 13,
                       fontWeight: FontWeight.w500)),
             ],
           ),
           const SizedBox(height: 20),
-          // Ring + number
           Row(
             children: [
               SizedBox(
@@ -530,7 +494,7 @@ class _CalorieRingCard extends StatelessWidget {
                     Text(
                       isOver
                           ? '${(consumed - target).round()} kcal over'
-                          : '${(target - consumed).round()} kcal left',
+                          : '${(target - consumed).round()} kcal remaining',
                       style: TextStyle(
                           color: Colors.white.withOpacity(0.85),
                           fontSize: 12,
@@ -558,7 +522,6 @@ class _RingPainter extends CustomPainter {
     final radius = size.width / 2 - 10;
     const strokeWidth = 10.0;
 
-    // Track
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       -math.pi / 2,
@@ -570,7 +533,6 @@ class _RingPainter extends CustomPainter {
         ..color = Colors.white.withOpacity(0.25),
     );
 
-    // Progress
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       -math.pi / 2,
@@ -633,8 +595,6 @@ class _MacroProgress extends StatelessWidget {
   }
 }
 
-// ── Weekly bar chart ───────────────────────────────────────────────────────────
-
 class _WeeklyBarChart extends StatelessWidget {
   final List<DailySummary> days;
   final double target;
@@ -659,7 +619,6 @@ class _WeeklyBarChart extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Chart
           SizedBox(
             height: 140,
             child: Row(
@@ -733,7 +692,6 @@ class _WeeklyBarChart extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          // Target line legend
           Row(
             children: [
               Container(
@@ -762,8 +720,6 @@ class _WeeklyBarChart extends StatelessWidget {
     return names[d.weekday - 1];
   }
 }
-
-// ── Quick stats grid ───────────────────────────────────────────────────────────
 
 class _QuickStatsGrid extends StatelessWidget {
   final List<NutritionLogEntry> entries;
@@ -800,7 +756,7 @@ class _QuickStatsGrid extends StatelessWidget {
             isDark: isDark),
         _StatCard(
             label: 'Avg. Calories',
-            value: avgCal > 0 ? '${avgCal.round()}' : '—',
+            value: avgCal > 0 ? '${avgCal.round()}' : '--',
             icon: Icons.local_fire_department_rounded,
             color: AppTheme.accentOrange,
             isDark: isDark),
@@ -813,7 +769,7 @@ class _QuickStatsGrid extends StatelessWidget {
         _StatCard(
             label: 'Unique Recipes',
             value: '$uniqueRecipes',
-            icon: Icons.auto_awesome_rounded,
+            icon: Icons.collections_bookmark_rounded,
             color: AppTheme.infoBlue,
             isDark: isDark),
       ],
@@ -879,8 +835,6 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ── Meal log tile ──────────────────────────────────────────────────────────────
-
 class _MealLogTile extends StatelessWidget {
   final NutritionLogEntry entry;
   final bool isDark;
@@ -908,7 +862,6 @@ class _MealLogTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Image / avatar
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: entry.recipeImage != null
@@ -980,7 +933,7 @@ class _MealLogTile extends StatelessWidget {
         decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
         child: Center(
           child: Text(
-            entry.recipeTitle.isNotEmpty ? entry.recipeTitle[0] : '🍽',
+            entry.recipeTitle.isNotEmpty ? entry.recipeTitle[0] : '',
             style: const TextStyle(fontSize: 22, color: Colors.white),
           ),
         ),
@@ -1009,8 +962,6 @@ class _MiniMacro extends StatelessWidget {
       );
 }
 
-// ── Day header for history ─────────────────────────────────────────────────────
-
 class _DayHeader extends StatelessWidget {
   final DailySummary summary;
   final bool isDark;
@@ -1035,7 +986,7 @@ class _DayHeader extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            '${summary.calories.round()} kcal · ${summary.mealCount} meal${summary.mealCount == 1 ? '' : 's'}',
+            '${summary.calories.round()} kcal  |  ${summary.mealCount} meal${summary.mealCount == 1 ? '' : 's'}',
             style: TextStyle(
                 fontSize: 12,
                 color: isDark
@@ -1056,8 +1007,6 @@ class _DayHeader extends StatelessWidget {
     return '${days[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}';
   }
 }
-
-// ── Streak banner ──────────────────────────────────────────────────────────────
 
 class _StreakBanner extends StatelessWidget {
   final int streak;
@@ -1092,7 +1041,8 @@ class _StreakBanner extends StatelessWidget {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  const Text('🔥', style: TextStyle(fontSize: 28)),
+                  const Icon(Icons.local_fire_department_rounded,
+                      color: Colors.white, size: 28),
                   const SizedBox(width: 8),
                   Text('$streak day${streak == 1 ? '' : 's'}',
                       style: const TextStyle(
@@ -1123,8 +1073,6 @@ class _StreakBanner extends StatelessWidget {
     );
   }
 }
-
-// ── Top recipe row ─────────────────────────────────────────────────────────────
 
 class _TopRecipeRow extends StatelessWidget {
   final int rank;
@@ -1185,7 +1133,7 @@ class _TopRecipeRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              '$count× cooked',
+              '${count}x cooked',
               style: const TextStyle(
                   fontSize: 11,
                   color: AppTheme.primaryPurple,
@@ -1197,8 +1145,6 @@ class _TopRecipeRow extends StatelessWidget {
     );
   }
 }
-
-// ── Cuisine chart ──────────────────────────────────────────────────────────────
 
 class _CuisineChart extends StatelessWidget {
   final List<MapEntry<String, int>> cuisines;
@@ -1243,7 +1189,7 @@ class _CuisineChart extends StatelessWidget {
                         style: const TextStyle(
                             fontWeight: FontWeight.w600, fontSize: 13)),
                     Text(
-                      '${(pct * 100).round()}% · ${kv.value} meal${kv.value == 1 ? '' : 's'}',
+                      '${(pct * 100).round()}%  |  ${kv.value} meal${kv.value == 1 ? '' : 's'}',
                       style: TextStyle(
                           fontSize: 11,
                           color: isDark
@@ -1271,8 +1217,6 @@ class _CuisineChart extends StatelessWidget {
   }
 }
 
-// ── Cooked recipe history tile ─────────────────────────────────────────────────
-
 class _CookedRecipeHistoryTile extends StatelessWidget {
   final CookedRecipe recipe;
   final bool isDark;
@@ -1292,7 +1236,6 @@ class _CookedRecipeHistoryTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Image
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: recipe.image != null
@@ -1314,13 +1257,13 @@ class _CookedRecipeHistoryTile extends StatelessWidget {
                 const SizedBox(height: 3),
                 Row(
                   children: [
-                    Text('Cooked ${recipe.cookCount}×',
+                    Text('Cooked ${recipe.cookCount}x',
                         style: const TextStyle(
                             fontSize: 11,
                             color: AppTheme.primaryPurple,
                             fontWeight: FontWeight.w600)),
                     const SizedBox(width: 8),
-                    Text('${recipe.readyInMinutes}m · ${recipe.calories.round()} cal',
+                    Text('${recipe.readyInMinutes}m  |  ${recipe.calories.round()} cal',
                         style: TextStyle(
                             fontSize: 11,
                             color: isDark
@@ -1331,7 +1274,6 @@ class _CookedRecipeHistoryTile extends StatelessWidget {
               ],
             ),
           ),
-          // Favorite star
           GestureDetector(
             onTap: () async {
               await RecipeHistoryService.instance.toggleFavorite(
@@ -1362,14 +1304,12 @@ class _CookedRecipeHistoryTile extends StatelessWidget {
             gradient: AppTheme.accentGradient),
         child: Center(
           child: Text(
-            recipe.title.isNotEmpty ? recipe.title[0] : '🍽',
+            recipe.title.isNotEmpty ? recipe.title[0] : '',
             style: const TextStyle(fontSize: 20, color: Colors.white),
           ),
         ),
       );
 }
-
-// ── Empty state ────────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
   final bool isDark;

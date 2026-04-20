@@ -170,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                         ),
                         Text(
-                          'AI-Powered Kitchen',
+                          'AI-Powered Smart Kitchen',
                           style: TextStyle(
                             fontSize: 11,
                             letterSpacing: 0.5,
@@ -221,7 +221,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        name != null ? 'Hello, $name 👋' : "What's cooking\ntoday?",
+                        name != null ? 'Hello, $name' : "What's cooking\ntoday?",
                         style: TextStyle(
                           fontFamily: 'Sora',
                           fontSize: name != null ? 28 : 34,
@@ -254,9 +254,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildFeatureGrid(BuildContext context, bool isDark) {
-    // 6 cards in a 3×2 grid — each row is a plain Row with two Expanded cards.
-    // Using plain Row + Expanded (no IntrinsicHeight) ensures the hit-test area
-    // covers the full card, fixing taps that previously missed near edges.
     final cards = [
       _GlassFeatureCard(
         delay: 0,
@@ -278,16 +275,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       _GlassFeatureCard(
         delay: 160,
-        icon: Icons.restaurant_rounded,
+        icon: Icons.restaurant_menu_rounded,
         title: 'Recipes',
-        description: 'Find what to cook',
+        description: 'Personalised picks',
         accentColor: const Color(0xFFFF6B6B),
         onTap: () => Navigator.pushNamed(context, AppRoutes.recipes),
         parentAnim: _gridCtrl,
       ),
       _GlassFeatureCard(
         delay: 240,
-        icon: Icons.auto_graph_rounded,
+        icon: Icons.bar_chart_rounded,
         title: 'Analytics',
         description: 'Nutrition history',
         accentColor: const Color(0xFFFFB800),
@@ -297,7 +294,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _GlassFeatureCard(
         delay: 320,
         icon: Icons.calendar_month_rounded,
-        title: 'Meal Plan',
+        title: 'Meal Planner',
         description: 'Plan your week',
         accentColor: const Color(0xFF4E9FF9),
         onTap: () => Navigator.pushNamed(context, AppRoutes.mealPlan),
@@ -305,7 +302,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       _GlassFeatureCard(
         delay: 400,
-        icon: Icons.feedback_rounded,
+        icon: Icons.rate_review_rounded,
         title: 'Feedback',
         description: 'Help us improve',
         accentColor: const Color(0xFFB24BF3),
@@ -326,10 +323,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Simple card row — avoids IntrinsicHeight which breaks hit-testing
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _CardRow extends StatelessWidget {
   final Widget left;
   final Widget right;
@@ -347,10 +340,6 @@ class _CardRow extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Combined Background
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _AmbientBackground extends StatelessWidget {
   final Animation<double> orbAnim;
@@ -449,10 +438,6 @@ class _Orb extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Frosted-glass feature card
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _GlassFeatureCard extends StatefulWidget {
   final int delay;
   final IconData icon;
@@ -521,11 +506,6 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
 
   @override
   Widget build(BuildContext context) {
-    // GestureDetector is the outermost interactive widget — OUTSIDE all
-    // Transform/FadeTransition/SlideTransition wrappers.  Transform.scale
-    // does not adjust its hit-test bounds, so placing GestureDetector inside
-    // it means the tap area stays at the pre-transform coordinates, which
-    // causes misses on right-column and lower cards.
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => _pressCtrl.reverse(),
@@ -634,8 +614,6 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
     );
   }
 }
-
-// ── Mode badge ────────────────────────────────────────────────────────────────
 
 class _ModeBadge extends StatelessWidget {
   final CookingMode mode;
