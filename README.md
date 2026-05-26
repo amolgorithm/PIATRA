@@ -51,6 +51,23 @@ Built with **Flutter**. Key integrations:
 
 ## Installation
 
+### Quick Install (Android APK)
+
+If you just want to run the app on an Android device without setting up a development environment, a pre-built APK is available in the [Releases](../../releases) tab of this repository.
+
+1. On your Android device, go to **Settings > Apps > Special app access > Install unknown apps** and allow your browser or file manager to install APKs.
+2. Open the [Releases](../../releases) page and download the latest `app-release.apk` file.
+3. Open the downloaded file on your device and tap **Install**.
+4. The backend is already deployed at the production URL, so no further setup is needed.
+
+> **Note:** This APK connects to the hosted backend automatically. iOS does not support sideloading APKs; iOS users must build from source using the developer setup below.
+
+---
+
+### Developer Setup
+
+The following instructions are for running the full project locally or deploying your own instance.
+
 ### Backend Prerequisites
 
 - Python 3.8+
@@ -300,7 +317,7 @@ The test suite currently covers Pydantic user models (`tests/test_users.py`). Fi
 - **Vision scan on low-light images** - Gemini Vision performs poorly on dark or blurry photos. Items may be missed or misidentified. The app filters out generic labels ("fruit", "vegetable") but specific items in poor lighting may still be wrong.
 - **Firebase offline mode** - If the device has no internet connection on first launch, Firebase cannot initialise and the app falls back to SQLite-only mode. Cloud sync will not work until connectivity is restored and the app is restarted.
 - **Pantry sync conflict resolution** - The current sync strategy is "cloud wins." If the same item is edited on two devices simultaneously while offline, the last cloud write will overwrite the other. There is no merge/conflict UI.
-- **Static Nutrition Tracking** - The calorie values displayed in the nutritional history remain fixed and do not update when servings are adjusted or ingredient substitutions are made, resulting in less accurate nutrition tracking.
+- **iOS camera permissions** - On some iOS versions, the first camera scan attempt may silently fail if camera permissions have not been granted. The user must go to Settings to grant permission manually.
 - **Recipe detail missing steps** - Some Spoonacular recipes do not include `analyzedInstructions`. For these recipes, the "Start Cooking" button shows a warning and cooking mode cannot be entered.
 
 ---
