@@ -325,6 +325,56 @@ Accepts in-app feedback and attempts to deliver it via Gmail SMTP. Email deliver
 
 ---
 
+## Optimizer — `/api/optimize`
+
+### `POST /api/optimize/meal-plan`
+
+Solves for the cheapest set of recipes that hits the user's nutrient targets under a budget and time limit, instead of the old weighted-score ranking. Candidates are passed in by the client (already pulled from Spoonacular/Firestore) since recipe data isn't stored server-side.
+
+**Request body**
+```json
+{
+  "candidates": [
+    {
+      "id": "recipe_123",
+      "name": "chicken rice bowl",
+      "cost": 4.5,
+      "prep_minutes": 20,
+      "nutrients": { "protein_g": 35, "sodium_mg": 500 },
+      "max_servings": 7
+    }
+  ],
+  "nutrient_targets": {
+    "minimums": { "protein_g": 300 },
+    "maximums": { "sodium_mg": 5000 }
+  },
+  "budget": 100,
+  "time_budget_minutes": 600,
+  "mode": "lp"
+}
+```
+`mode` is `"lp"` (hard constraints, can come back infeasible) or `"qp"` (nutrient minimums become a soft penalty instead of a wall, so it always returns something).
+
+**Response `200`**
+```json
+{
+  "status": "optimal",
+  "plan": [
+    { "id": "recipe_123", "name": "chicken rice bowl", "servings": 3.37, "cost": 15.17 }
+  ],
+  "total_cost": 36.16,
+  "total_time_minutes": 193.4,
+  "nutrients_achieved": { "protein_g": 300.0, "sodium_mg": 4835.71 },
+  "message": null
+}
+```
+`status` is `"optimal"` (lp solved cleanly), `"penalized"` (qp solved, may miss some targets), or `"infeasible"` (lp only, nothing fits, try qp or loosen a constraint).
+
+**Response `400`** — empty candidates list
+**Response `500`** — solver error
+
+---
+
 ## Stub Endpoints
 
 The following endpoints exist as router stubs and return placeholder responses. They are reserved for future server-side implementation; the current app manages this data client-side via Firestore and Spoonacular.
