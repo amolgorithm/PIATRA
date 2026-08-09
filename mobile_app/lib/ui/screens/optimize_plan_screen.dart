@@ -73,7 +73,7 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
     setState(() {
       _loading = false;
       _result = result;
-      if (result == null) _error = 'Solver request failed, check your connection and try again.';
+      if (result == null) _error = OptimizerService.instance.lastError ?? 'Something went wrong, try again.';
     });
   }
 
@@ -108,10 +108,20 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
                     _buildForm(isDark),
                     const SizedBox(height: 20),
                     if (_error != null) _buildError(),
-                    if (_loading) const Center(child: Padding(
+                    if (_loading) const Padding(
                       padding: EdgeInsets.only(top: 40),
-                      child: CircularProgressIndicator(color: AppTheme.primaryPurple),
-                    )),
+                      child: Column(
+                        children: [
+                          CircularProgressIndicator(color: AppTheme.primaryPurple),
+                          SizedBox(height: 12),
+                          Text(
+                            'Solving... first request can take a bit if the server was asleep.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryLight),
+                          ),
+                        ],
+                      ),
+                    ),
                     if (_result != null && !_loading) _buildResult(isDark),
                   ],
                 ),
