@@ -31,8 +31,8 @@ jobs:
 
       - name: Create non-empty .env file
         run: |
-          echo "SPOONACULAR_API_KEY=${{ secrets.SPOONACULAR_API_KEY }}" > mobile_app/.env
-          echo "BACKEND_URL=${{ secrets.BACKEND_URL }}" >> mobile_app/.env
+          echo "SPOONACULAR_API_KEY=${{ secrets.SPOONACULAR_API_KEY }}" > .env
+          echo "BACKEND_URL=${{ secrets.BACKEND_URL }}" >> .env
 
       - name: Build Android Debug APK
         run: flutter build apk --debug
