@@ -29,8 +29,10 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Create dummy .env file
-        run: touch .env
+      - name: Create non-empty .env file
+        run: |
+          echo "SPOONACULAR_API_KEY=${{ secrets.SPOONACULAR_API_KEY }}" > mobile_app/.env
+          echo "BACKEND_URL=${{ secrets.BACKEND_URL }}" >> mobile_app/.env
 
       - name: Build Android Debug APK
         run: flutter build apk --debug
