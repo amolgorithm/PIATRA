@@ -6,7 +6,6 @@ import '../../core/constants/theme/app_theme.dart';
 import '../widgets/ai_assistant_fab.dart';
 import '../widgets/theme_toggle_fab.dart';
 import '../widgets/overview_fab.dart';
-import '../widgets/soda_background_painter.dart';
 import '../../state/user_provider.dart';
 import '../../state/recipe_provider.dart';
 import '../../models/user_profile_model.dart';
@@ -100,14 +99,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: isDark ? AppTheme.backgroundDark : AppTheme.backgroundLight,
       body: Stack(
         children: [
-          _AmbientBackground(orbAnim: _orbAnim, isDark: isDark),
           SafeArea(
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                SliverToBoxAdapter(child: _buildHeader(isDark)),
+                SliverToBoxAdapter(child: _buildHeroHeader(isDark)),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                   sliver: SliverToBoxAdapter(
@@ -117,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                const SliverToBoxAdapter(child: SizedBox(height: 240)),
+                const SliverToBoxAdapter(child: SizedBox(height: 120)),
               ],
             ),
           ),
@@ -129,6 +128,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           const AIAssistantFAB(),
         ],
+      ),
+    );
+  }
+
+  // Flat gradient panel instead of the old full-screen animated background.
+  // Just the header sits on color, rest of the page is plain and light,
+  // reads a lot closer to a normal iOS app than a photo-background hero.
+  Widget _buildHeroHeader(bool isDark) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+      child: Container(
+        decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
+        child: Stack(
+          children: [
+            AnimatedBuilder(
+              animation: _orbAnim,
+              builder: (_, __) {
+                final t = _orbAnim.value;
+                return Stack(
+                  children: [
+                    Positioned(
+                      top: -40 + t * 14,
+                      right: -60 + t * 10,
+                      child: _Orb(size: 200, color: Colors.white.withOpacity(0.10)),
+                    ),
+                    Positioned(
+                      bottom: -50 + t * 10,
+                      left: -40 + t * 8,
+                      child: _Orb(size: 160, color: AppTheme.secondaryTeal.withOpacity(0.18)),
+                    ),
+                  ],
+                );
+              },
+            ),
+            _buildHeader(isDark),
+          ],
+        ),
       ),
     );
   }
@@ -336,82 +372,6 @@ class _CardRow extends StatelessWidget {
         Expanded(child: left),
         const SizedBox(width: 14),
         Expanded(child: right),
-      ],
-    );
-  }
-}
-
-class _AmbientBackground extends StatelessWidget {
-  final Animation<double> orbAnim;
-  final bool isDark;
-  const _AmbientBackground({required this.orbAnim, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(child: SodaBackground(isDark: isDark)),
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: isDark
-                    ? [
-                        Colors.black.withOpacity(0.55),
-                        Colors.black.withOpacity(0.30),
-                        Colors.black.withOpacity(0.55),
-                      ]
-                    : [
-                        Colors.black.withOpacity(0.28),
-                        Colors.black.withOpacity(0.10),
-                        Colors.black.withOpacity(0.35),
-                      ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
-        ),
-        AnimatedBuilder(
-          animation: orbAnim,
-          builder: (_, __) {
-            final t = orbAnim.value;
-            return Stack(
-              children: [
-                Positioned(
-                  top: -60 + t * 20,
-                  right: -80 + t * 15,
-                  child: _Orb(
-                    size: 280,
-                    color: isDark
-                        ? AppTheme.primaryPurple.withOpacity(0.15)
-                        : AppTheme.primaryPurple.withOpacity(0.08),
-                  ),
-                ),
-                Positioned(
-                  top: 260 + t * 30,
-                  left: -100 + t * 10,
-                  child: _Orb(
-                    size: 220,
-                    color: isDark
-                        ? AppTheme.secondaryTeal.withOpacity(0.08)
-                        : AppTheme.secondaryTeal.withOpacity(0.06),
-                  ),
-                ),
-                Positioned(
-                  bottom: 100 - t * 20,
-                  right: -60 + t * 8,
-                  child: _Orb(
-                    size: 180,
-                    color: isDark
-                        ? AppTheme.accentOrange.withOpacity(0.06)
-                        : AppTheme.accentOrange.withOpacity(0.04),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
       ],
     );
   }

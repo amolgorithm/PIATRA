@@ -443,12 +443,27 @@ class MealPlanService {
   }) async {
     final plan = await getOrCreateCurrentWeekPlan();
 
-    final occurrences = <SpoonacularRecipe>[];
+    // round robin across recipes instead of using up one recipe's whole
+    // count before moving to the next. the old version would fill 3+
+    // consecutive days with the exact same dinner before switching, which
+    // reads as "it just picked one recipe" even when the solver actually
+    // picked several
+    final queue = <MapEntry<SpoonacularRecipe, int>>[];
     for (final item in items) {
       final recipe = recipesById[item.id];
       if (recipe == null) continue; // shouldn't happen, id came from our own candidates
-      final count = item.servings.round().clamp(1, 7);
-      occurrences.addAll(List.filled(count, recipe));
+      queue.add(MapEntry(recipe, item.servings.round().clamp(1, 3)));
+    }
+
+    final occurrences = <SpoonacularRecipe>[];
+    final remaining = queue.map((e) => e.value).toList();
+    while (remaining.any((c) => c > 0)) {
+      for (var i = 0; i < queue.length; i++) {
+        if (remaining[i] > 0) {
+          occurrences.add(queue[i].key);
+          remaining[i]--;
+        }
+      }
     }
 
     // dinner fills first since that's the slot people plan around most,

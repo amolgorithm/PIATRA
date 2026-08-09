@@ -189,6 +189,13 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     // the two views telling the same story instead of disagreeing
     const weeklyProteinTarget = 350.0;
 
+    final distinctRecipes = <int>{};
+    for (final day in _plan!.days) {
+      for (final meal in day.meals.values) {
+        distinctRecipes.add(meal.recipeId);
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: WeeklyNutritionCard(
@@ -196,6 +203,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         proteinTarget: weeklyProteinTarget,
         mealsPlanned: _plan!.totalMeals,
         mealsTotal: 28, // 7 days x 4 slots
+        distinctRecipes: distinctRecipes.length,
         onAutoPlan: _openAutoPlan,
       ),
     );
@@ -226,9 +234,8 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
               margin: const EdgeInsets.only(right: 8),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                gradient: isSelected ? AppTheme.primaryGradient : null,
                 color: isSelected
-                    ? null
+                    ? AppTheme.primaryPurple
                     : (isDark ? AppTheme.cardDark : Colors.white),
                 borderRadius: BorderRadius.circular(14),
                 border: isToday && !isSelected

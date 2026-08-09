@@ -80,7 +80,12 @@ class OptimizerService {
       'cost': r.pricePerServing,
       'prep_minutes': r.readyInMinutes.toDouble(),
       'nutrients': NutrientMapper.toOptimizerNutrients(r.nutrition),
-      'max_servings': 7, // don't let a week's plan be the same recipe 20x
+      'max_servings': 3, // cap per recipe so the solver has to combine
+                         // several different recipes instead of covering
+                         // the whole week with just the cheapest one. an LP
+                         // optimum sits at a vertex of the feasible region,
+                         // vertices are sparse by nature, so a loose cap
+                         // (was 7, a full week) let one recipe dominate
     };
   }
 

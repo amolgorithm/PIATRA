@@ -1,8 +1,8 @@
 // lib/ui/screens/optimize_plan_screen.dart
 //
 // Lets the user set a budget/time/nutrient target and hands it to the
-// backend LP/QP solver, then shows what it picked and lets them drop it
-// straight into this week's meal plan.
+// backend LP/QP solver, then shows what it picked, why, and lets them
+// drop it straight into this week's meal plan.
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -31,6 +31,7 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
   bool _loading = false;
   String? _error;
   OptimizedMealPlan? _result;
+  int _candidateCount = 0; // recipes actually sent to the solver, for the "how this ran" panel
 
   // keep the recipes we sent up so "apply" doesn't need to refetch them
   Map<String, SpoonacularRecipe> _recipesById = {};
@@ -45,10 +46,11 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
   }
 
   Future<void> _generate() async {
-    final candidates = context.read<RecipeProvider>().rankedRecipes.map((r) => r.recipe).toList();
+    final allCandidates = context.read<RecipeProvider>().rankedRecipes.map((r) => r.recipe).toList();
+    final priced = allCandidates.where((r) => r.pricePerServing != null).toList();
 
-    if (candidates.isEmpty) {
-      setState(() => _error = 'No recipes loaded yet, go pull up recommendations first.');
+    if (priced.isEmpty) {
+      setState(() => _error = 'None of your loaded recipes have price data yet, try refreshing recommendations first.');
       return;
     }
 
@@ -56,12 +58,13 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
       _loading = true;
       _error = null;
       _result = null;
+      _candidateCount = priced.length;
     });
 
-    _recipesById = {for (final r in candidates) r.id.toString(): r};
+    _recipesById = {for (final r in priced) r.id.toString(): r};
 
     final result = await OptimizerService.instance.optimizeWeeklyPlan(
-      candidates: candidates,
+      candidates: priced,
       nutrientMinimums: {'protein_g': double.tryParse(_proteinCtrl.text) ?? 0},
       nutrientMaximums: {'sodium_mg': double.tryParse(_sodiumCtrl.text) ?? 0},
       budget: double.tryParse(_budgetCtrl.text) ?? 0,
@@ -106,23 +109,14 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildForm(isDark),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     if (_error != null) _buildError(),
-                    if (_loading) const Padding(
-                      padding: EdgeInsets.only(top: 40),
-                      child: Column(
-                        children: [
-                          CircularProgressIndicator(color: AppTheme.primaryPurple),
-                          SizedBox(height: 12),
-                          Text(
-                            'Solving... first request can take a bit if the server was asleep.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryLight),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_result != null && !_loading) _buildResult(isDark),
+                    if (_loading) _buildLoading(),
+                    if (_result != null && !_loading) ...[
+                      _buildHowThisRan(isDark),
+                      const SizedBox(height: 16),
+                      _buildResult(isDark),
+                    ],
                   ],
                 ),
               ),
@@ -135,7 +129,7 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
 
   Widget _buildHeader(bool isDark) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Row(
         children: [
           IconButton(
@@ -154,10 +148,13 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
 
   Widget _buildForm(bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,15 +174,9 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
               Expanded(child: _numberField('Sodium cap (mg)', _sodiumCtrl)),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _modeChip('lp', 'Hard targets'),
-              const SizedBox(width: 8),
-              _modeChip('qp', 'Best effort'),
-            ],
-          ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+          _modeSwitch(isDark),
+          const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -211,25 +202,129 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
     );
   }
 
-  Widget _modeChip(String value, String label) {
+  // flat two-way segmented control, apple settings style, instead of chips
+  Widget _modeSwitch(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.backgroundDark : AppTheme.backgroundLight,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _segment('lp', 'Hard targets')),
+          Expanded(child: _segment('qp', 'Best effort')),
+        ],
+      ),
+    );
+  }
+
+  Widget _segment(String value, String label) {
     final selected = _mode == value;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      selectedColor: AppTheme.primaryPurple.withOpacity(0.2),
-      onSelected: (_) => setState(() => _mode = value),
+    return GestureDetector(
+      onTap: () => setState(() => _mode = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.primaryPurple : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppTheme.textSecondaryLight,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoading() {
+    return const Padding(
+      padding: EdgeInsets.only(top: 32),
+      child: Column(
+        children: [
+          CircularProgressIndicator(color: AppTheme.primaryPurple),
+          SizedBox(height: 12),
+          Text(
+            'Solving... first request can take a bit if the server was asleep.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryLight),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildError() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 4, top: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.errorRed.withOpacity(0.1),
+        color: AppTheme.errorRed.withOpacity(0.08),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(_error!, style: const TextStyle(color: AppTheme.errorRed, fontSize: 13)),
+    );
+  }
+
+  // this is the part that actually answers "what is even going on" —
+  // spells out what the solver was given and what it did with it, in plain
+  // language, instead of just dropping a result on screen
+  Widget _buildHowThisRan(bool isDark) {
+    final r = _result!;
+    final modeLabel = _mode == 'qp' ? 'best-effort (soft targets)' : 'hard-target';
+    final distinctRecipes = r.plan.length;
+
+    final steps = [
+      'Looked at $_candidateCount recipes with pricing available.',
+      'Applied your protein floor, sodium cap, budget, and time limit.',
+      'Solved a $modeLabel linear program over all $_candidateCount options.',
+      r.isInfeasible
+          ? 'No combination satisfied every constraint at once.'
+          : 'Landed on $distinctRecipes distinct recipe${distinctRecipes == 1 ? '' : 's'}, capped at 3 servings each so one cheap recipe can\'t eat the whole week.',
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.cardDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.route_rounded, size: 16, color: AppTheme.primaryPurple),
+              SizedBox(width: 6),
+              Text('How this ran', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (var i = 0; i < steps.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${i + 1}.', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondaryLight)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(steps[i], style: const TextStyle(fontSize: 12.5, height: 1.4)),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -250,22 +345,31 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
       );
     }
 
+    final budget = double.tryParse(_budgetCtrl.text) ?? 0;
+    final timeBudget = double.tryParse(_timeCtrl.text) ?? 0;
+    final budgetUsedPct = budget == 0 ? 0.0 : (r.totalCost / budget * 100).clamp(0, 999);
+    final timeUsedPct = timeBudget == 0 ? 0.0 : (r.totalTimeMinutes / timeBudget * 100).clamp(0, 999);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('This week\'s plan', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 4),
         Text(
-          '\$${r.totalCost.toStringAsFixed(2)} · ${r.totalTimeMinutes.round()} min total',
-          style: const TextStyle(fontSize: 13, color: AppTheme.textSecondaryLight),
+          '\$${r.totalCost.toStringAsFixed(2)} of \$${budget.toStringAsFixed(0)} budget (${budgetUsedPct.toStringAsFixed(0)}%) · '
+          '${r.totalTimeMinutes.round()} of ${timeBudget.toStringAsFixed(0)} min (${timeUsedPct.toStringAsFixed(0)}%)',
+          style: const TextStyle(fontSize: 12.5, color: AppTheme.textSecondaryLight),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         ...r.plan.map((item) => Container(
               margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: isDark ? AppTheme.cardDark : Colors.white,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.05),
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -284,7 +388,7 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
           minimums: {'protein_g': double.tryParse(_proteinCtrl.text) ?? 0},
           maximums: {'sodium_mg': double.tryParse(_sodiumCtrl.text) ?? 0},
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           child: ElevatedButton(

@@ -16,7 +16,9 @@ class MealCandidate(BaseModel):
     cost: float                 # dollars per serving
     prep_minutes: float
     nutrients: Dict[str, float]  # e.g. {"protein_g": 32, "sodium_mg": 410}
-    max_servings: float = 7      # stop the solver from picking 14x the same lasagna
+    max_servings: float = 3      # keep this loose and the solver will happily
+                                  # cover the whole week with one cheap recipe,
+                                  # LP optima concentrate on very few variables
 
 
 class OptimizeRequest(BaseModel):
