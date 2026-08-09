@@ -17,6 +17,7 @@ import '../../state/user_provider.dart';
 import '../../models/user_profile_model.dart';
 import 'shopping_list_screen.dart';
 import 'optimize_plan_screen.dart';
+import '../widgets/weekly_nutrition_card.dart';
 
 class MealPlanScreen extends StatefulWidget {
   const MealPlanScreen({super.key});
@@ -121,6 +122,7 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
         child: Column(
           children: [
             _buildHeader(isDark),
+            if (!_loading) _buildNutritionCard(isDark),
             _buildDaySelector(isDark),
             Expanded(
               child: _loading
@@ -175,15 +177,26 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 foregroundColor: AppTheme.primaryPurple,
               ),
             ),
-          TextButton.icon(
-            onPressed: _openAutoPlan,
-            icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-            label: const Text('Auto-plan'),
-            style: TextButton.styleFrom(
-              foregroundColor: AppTheme.primaryPurple,
-            ),
-          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildNutritionCard(bool isDark) {
+    if (_plan == null) return const SizedBox.shrink();
+
+    // 350g/week matches the default floor on the auto-plan screen, keeps
+    // the two views telling the same story instead of disagreeing
+    const weeklyProteinTarget = 350.0;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: WeeklyNutritionCard(
+        proteinAchieved: _plan!.weeklyProtein,
+        proteinTarget: weeklyProteinTarget,
+        mealsPlanned: _plan!.totalMeals,
+        mealsTotal: 28, // 7 days x 4 slots
+        onAutoPlan: _openAutoPlan,
       ),
     );
   }
