@@ -213,6 +213,8 @@ class MealPlan {
 
   int get totalMeals => days.fold(0, (s, d) => s + d.meals.length);
 
+  double get weeklyProtein => days.fold(0.0, (s, d) => s + d.totalProtein);
+
   Map<String, dynamic> toMap() => {
     'weekKey':   id,
     'weekStart': Timestamp.fromDate(weekStart),
