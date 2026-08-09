@@ -4,6 +4,7 @@
 // /api/optimize/meal-plan endpoint. Recipe data stays client-side like
 // everywhere else in the app, this just packages it up and sends it over.
 
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -63,6 +64,10 @@ class OptimizerService {
   OptimizerService._();
   static final OptimizerService instance = OptimizerService._();
 
+  // whatever went wrong on the last call, so the UI can say something
+  // more useful than "it failed." null means the last call worked.
+  String? lastError;
+
   /// Turns a spoonacular recipe into the candidate shape the backend wants.
   /// Skips recipes with no price data, the LP can't do anything with a
   /// candidate that has no cost, and Spoonacular doesn't always have it.
@@ -87,9 +92,11 @@ class OptimizerService {
     required double timeBudgetMinutes,
     String mode = 'lp',
   }) async {
+    lastError = null;
     final mapped = candidates.map(_toCandidate).whereType<Map<String, dynamic>>().toList();
 
     if (mapped.isEmpty) {
+      lastError = 'None of your loaded recipes have price data yet, try refreshing recommendations first.';
       debugPrint('[Optimizer] no candidates had price data, nothing to send');
       return null;
     }
@@ -112,17 +119,28 @@ class OptimizerService {
             headers: {'Content-Type': 'application/json'},
             body: body,
           )
-          .timeout(const Duration(seconds: 20));
+          // free-tier render sleeps after inactivity, first hit can take
+          // 30-50s to cold start. 20s was killing every "first request of
+          // the day" call before it even had a chance to spin up.
+          .timeout(const Duration(seconds: 60));
 
       if (response.statusCode == 200) {
         return OptimizedMealPlan.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
       }
 
+      lastError = 'Backend returned ${response.statusCode}. ${_shorten(response.body)}';
       debugPrint('[Optimizer] error ${response.statusCode}: ${response.body}');
       return null;
+    } on TimeoutException {
+      lastError = 'Server took too long to respond. If this is the first request in a while the backend may still be waking up, try again in a moment.';
+      debugPrint('[Optimizer] timeout waiting for solver');
+      return null;
     } catch (e) {
+      lastError = 'Could not reach the backend: $e';
       debugPrint('[Optimizer] exception: $e');
       return null;
     }
   }
+
+  String _shorten(String s) => s.length > 160 ? '${s.substring(0, 160)}...' : s;
 }
