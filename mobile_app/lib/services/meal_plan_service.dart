@@ -13,6 +13,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'spoonacular_service.dart';
+import 'optimizer_service.dart' show PlanItem;
 
 // ── Enums ──────────────────────────────────────────────────────────────────────
 
@@ -425,6 +426,53 @@ class MealPlanService {
       id: plan.id, weekStart: plan.weekStart,
       days: updatedDays, name: plan.name, createdAt: plan.createdAt,
     ));
+  }
+
+  // ── Apply an optimized plan ─────────────────────────────────────────────────
+
+  /// Takes what the LP/QP solver picked and drops it into real day/slot spots
+  /// on the current week. Servings come back as a float (e.g. 3.37 servings
+  /// of lentil soup), round to the nearest whole meal since you can't cook
+  /// a third of a bowl, and cap at 7 since that's the max the solver was told
+  /// to consider per recipe anyway.
+  Future<MealPlan> applyOptimizedPlan({
+    required List<PlanItem> items,
+    required Map<String, SpoonacularRecipe> recipesById,
+  }) async {
+    final plan = await getOrCreateCurrentWeekPlan();
+
+    final occurrences = <SpoonacularRecipe>[];
+    for (final item in items) {
+      final recipe = recipesById[item.id];
+      if (recipe == null) continue; // shouldn't happen, id came from our own candidates
+      final count = item.servings.round().clamp(1, 7);
+      occurrences.addAll(List.filled(count, recipe));
+    }
+
+    // dinner fills first since that's the slot people plan around most,
+    // then spill into lunch, breakfast, snack as the list runs out
+    const slotPriority = [
+      MealSlot.dinner,
+      MealSlot.lunch,
+      MealSlot.breakfast,
+      MealSlot.snack,
+    ];
+
+    var i = 0;
+    outer:
+    for (final slot in slotPriority) {
+      for (var day = 0; day < 7; day++) {
+        if (i >= occurrences.length) break outer;
+        await addMealToDay(
+          planId: plan.id,
+          dayIndex: day,
+          meal: PlannedMeal.fromSpoonacular(occurrences[i], slot),
+        );
+        i++;
+      }
+    }
+
+    return await loadPlan(plan.id) ?? plan;
   }
 
   // ── Load plans ──────────────────────────────────────────────────────────────

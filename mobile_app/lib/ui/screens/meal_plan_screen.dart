@@ -16,6 +16,7 @@ import '../../state/recipe_provider.dart';
 import '../../state/user_provider.dart';
 import '../../models/user_profile_model.dart';
 import 'shopping_list_screen.dart';
+import 'optimize_plan_screen.dart';
 
 class MealPlanScreen extends StatefulWidget {
   const MealPlanScreen({super.key});
@@ -101,6 +102,14 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
     );
   }
 
+  Future<void> _openAutoPlan() async {
+    final applied = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const OptimizePlanScreen()),
+    );
+    if (applied == true) await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -166,6 +175,14 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 foregroundColor: AppTheme.primaryPurple,
               ),
             ),
+          TextButton.icon(
+            onPressed: _openAutoPlan,
+            icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+            label: const Text('Auto-plan'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.primaryPurple,
+            ),
+          ),
         ],
       ),
     );
