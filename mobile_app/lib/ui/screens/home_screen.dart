@@ -142,25 +142,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
         child: Stack(
           children: [
-            AnimatedBuilder(
-              animation: _orbAnim,
-              builder: (_, __) {
-                final t = _orbAnim.value;
-                return Stack(
-                  children: [
-                    Positioned(
-                      top: -40 + t * 14,
-                      right: -60 + t * 10,
-                      child: _Orb(size: 200, color: Colors.white.withOpacity(0.10)),
-                    ),
-                    Positioned(
-                      bottom: -50 + t * 10,
-                      left: -40 + t * 8,
-                      child: _Orb(size: 160, color: AppTheme.secondaryTeal.withOpacity(0.18)),
-                    ),
-                  ],
-                );
-              },
+            // orbs go behind the header text. Positioned.fill needs a
+            // sized stack to fill, _buildHeader below is the one
+            // non-positioned child that actually gives the stack a size,
+            // a stack made of nothing but Positioned children has no way
+            // to size itself and blows up with an unbounded height here
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _orbAnim,
+                builder: (_, __) {
+                  final t = _orbAnim.value;
+                  return Stack(
+                    children: [
+                      Positioned(
+                        top: -40 + t * 14,
+                        right: -60 + t * 10,
+                        child: _Orb(size: 200, color: Colors.white.withOpacity(0.10)),
+                      ),
+                      Positioned(
+                        bottom: -50 + t * 10,
+                        left: -40 + t * 8,
+                        child: _Orb(size: 160, color: AppTheme.secondaryTeal.withOpacity(0.18)),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
             _buildHeader(isDark),
           ],
