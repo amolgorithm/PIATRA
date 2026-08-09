@@ -175,6 +175,7 @@ class SpoonacularRecipe {
   final bool veryPopular;
   final int? healthScore;
   final double? spoonacularScore;
+  final double? pricePerServing; // dollars, converted from spoonacular's cents
   final List<SpoonacularIngredient> ingredients;
   final List<SpoonacularStep> steps;
   final SpoonacularNutrition nutrition;
@@ -205,6 +206,7 @@ class SpoonacularRecipe {
     required this.veryPopular,
     this.healthScore,
     this.spoonacularScore,
+    this.pricePerServing,
     required this.ingredients,
     required this.steps,
     required this.nutrition,
@@ -247,6 +249,10 @@ class SpoonacularRecipe {
       veryPopular: j['veryPopular'] as bool? ?? false,
       healthScore: (j['healthScore'] as num?)?.toInt(),
       spoonacularScore: (j['spoonacularScore'] as num?)?.toDouble(),
+      // spoonacular gives this in cents, per serving, already computed for us
+      pricePerServing: (j['pricePerServing'] as num?)?.toDouble() != null
+          ? (j['pricePerServing'] as num).toDouble() / 100
+          : null,
       ingredients: (j['extendedIngredients'] as List<dynamic>?)
               ?.map((i) => SpoonacularIngredient.fromJson(
                   i as Map<String, dynamic>))

@@ -154,7 +154,7 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
         children: [
           Row(
             children: [
-              Expanded(child: _numberField('Weekly budget ($)', _budgetCtrl)),
+              Expanded(child: _numberField('Weekly budget (\$)', _budgetCtrl)),
               const SizedBox(width: 12),
               Expanded(child: _numberField('Time budget (min)', _timeCtrl)),
             ],

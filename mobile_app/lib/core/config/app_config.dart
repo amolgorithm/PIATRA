@@ -31,4 +31,6 @@ class AppConfig {
   // Trailing slash required — FastAPI redirects /api/feedback → /api/feedback/
   // without it, causing a 307 that drops the POST body.
   static String get feedbackUrl          => '$baseUrl/api/feedback/';
+
+  static String get optimizeMealPlanUrl  => '$baseUrl/api/optimize/meal-plan';
 }
