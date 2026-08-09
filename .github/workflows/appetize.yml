@@ -29,8 +29,10 @@ jobs:
       - name: Get Dependencies
         run: flutter pub get
 
-      - name: Create dummy .env file
-        run: touch .env
+      - name: Create non-empty .env file
+        run: |
+          echo "SPOONACULAR_API_KEY=${{ secrets.SPOONACULAR_API_KEY }}" > .env
+          echo "BACKEND_URL=${{ secrets.BACKEND_URL }}" >> .env
 
       - name: Build Android Debug APK
         run: flutter build apk --debug
@@ -39,5 +41,5 @@ jobs:
         uses: appetizeio/github-action-appetize@v1.0.5
         with:
           apiToken: ${{ secrets.APPETIZE_API_TOKEN }}
-          appFile: build/app/outputs/flutter-apk/app-debug.apk
+          appFile: mobile_app/build/app/outputs/flutter-apk/app-debug.apk
           platform: 'android'
