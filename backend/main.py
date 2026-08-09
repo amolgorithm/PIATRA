@@ -1,6 +1,7 @@
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import assistant, nutrition, pantry, recipes, users, feedback
+from app.api import assistant, nutrition, pantry, recipes, users, feedback, optimize
 
 app = FastAPI(title="PIATRA Backend API", version="1.0.0")
 
@@ -21,6 +22,7 @@ app.include_router(pantry, prefix="/api/pantry", tags=["pantry"])
 app.include_router(recipes, prefix="/api/recipes", tags=["recipes"])
 app.include_router(users, prefix="/api/users", tags=["users"])
 app.include_router(feedback, prefix="/api/feedback", tags=["feedback"])
+app.include_router(optimize, prefix="/api/optimize", tags=["optimize"])
 
 @app.get("/")
 async def root():
@@ -32,5 +34,4 @@ async def health():
     return {"status": "ok"}
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
