@@ -39,5 +39,5 @@ jobs:
         uses: appetizeio/github-action-appetize@v1.0.5
         with:
           apiToken: ${{ secrets.APPETIZE_API_TOKEN }}
-          appFile: build/app/outputs/flutter-apk/app-debug.apk
+          appFile: mobile_app/build/app/outputs/flutter-apk/app-debug.apk
           platform: 'android'
