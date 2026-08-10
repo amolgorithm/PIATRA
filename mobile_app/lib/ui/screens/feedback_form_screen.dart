@@ -2,6 +2,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/config/app_config.dart';
@@ -223,8 +224,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
                 const SizedBox(height: 32),
                 Text(
                   'Thank you!',
-                  style: TextStyle(
-                    fontFamily: 'Sora',
+                  style: GoogleFonts.inter(
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
                     color: isDark
@@ -379,8 +379,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
           const SizedBox(height: 24),
           Text(
             'Share Your\nFeedback',
-            style: TextStyle(
-              fontFamily: 'Sora',
+            style: GoogleFonts.inter(
               fontSize: 34,
               fontWeight: FontWeight.w800,
               height: 1.15,
@@ -409,8 +408,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen>
   Widget _sectionLabel(String text, bool isDark) {
     return Text(
       text,
-      style: TextStyle(
-        fontFamily: 'Sora',
+      style: GoogleFonts.inter(
         fontSize: 14,
         fontWeight: FontWeight.w700,
         color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,

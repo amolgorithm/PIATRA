@@ -5,6 +5,7 @@
 // calorie target, cooking mode, and favourite cuisines.
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/theme/app_theme.dart';
 import '../../state/user_provider.dart';
@@ -189,8 +190,7 @@ class _OverviewPopup extends StatelessWidget {
                   const SizedBox(width: 10),
                   Text(
                     'Overview',
-                    style: TextStyle(
-                      fontFamily: 'Sora',
+                    style: GoogleFonts.inter(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: isDark
@@ -334,8 +334,7 @@ class _PopupStat extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               value,
-              style: TextStyle(
-                fontFamily: 'Sora',
+              style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
                 color: color,

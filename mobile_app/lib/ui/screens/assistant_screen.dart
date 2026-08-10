@@ -1,6 +1,7 @@
 // lib/ui/screens/assistant_screen.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../../core/constants/theme/app_theme.dart';
@@ -257,8 +258,7 @@ class _AssistantScreenState extends State<AssistantScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('PIATRA Assistant',
-                    style: TextStyle(
-                      fontFamily: 'Sora',
+                    style: GoogleFonts.inter(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,

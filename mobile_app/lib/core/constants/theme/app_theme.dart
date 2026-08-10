@@ -4,8 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // ── Core palette ───────────────────────────────────────────────────────────
-  static const Color primaryPurple    = Color(0xFF7C6EFA);
-  static const Color primaryPurpleDeep = Color(0xFF5B4FD4);
+  // Single accent, two shades of the same purple. Deep for anything that
+  // needs to read clearly against white (buttons, icons), light only ever
+  // used as a low-opacity tint behind something, never as its own surface.
+  static const Color primaryPurple    = Color(0xFF6552E8);
+  static const Color primaryPurpleDeep = Color(0xFF4E3FC7);
   static const Color secondaryTeal    = Color(0xFF00D4AA);
   static const Color accentOrange     = Color(0xFFFF6B6B);
   static const Color accentAmber      = Color(0xFFFFB347);
@@ -39,7 +42,7 @@ class AppTheme {
 
   // ── Gradients ──────────────────────────────────────────────────────────────
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF7C6EFA), Color(0xFF5B4FD4)],
+    colors: [Color(0xFF6552E8), Color(0xFF4E3FC7)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -64,16 +67,20 @@ class AppTheme {
 
   // Mesh-style background glow for dark mode hero areas
   static RadialGradient get purpleGlow => const RadialGradient(
-    colors: [Color(0x337C6EFA), Color(0x00000000)],
+    colors: [Color(0x336552E8), Color(0x00000000)],
     radius: 0.8,
   );
 
   // ── Text styles ────────────────────────────────────────────────────────────
-  // Using Sora for display + DM Sans for body — distinctive pairing
-  static TextStyle _display(Color c) => GoogleFonts.sora(
+  // One family (Inter) everywhere, hierarchy comes from weight and size only.
+  // Was Sora for display + DM Sans for body, dropped the pairing, several
+  // screens also had raw fontFamily: 'Sora' strings that were never actually
+  // registered as a local font asset, so they silently fell back to the
+  // platform default, that's what made text look inconsistent across screens.
+  static TextStyle _display(Color c) => GoogleFonts.inter(
     color: c, fontWeight: FontWeight.w800, letterSpacing: -1.0,
   );
-  static TextStyle _body(Color c) => GoogleFonts.dmSans(color: c);
+  static TextStyle _body(Color c) => GoogleFonts.inter(color: c);
 
   // ── Light Theme ────────────────────────────────────────────────────────────
   static ThemeData get lightTheme {
@@ -101,7 +108,7 @@ class AppTheme {
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         centerTitle: false,
         iconTheme: const IconThemeData(color: textPrimaryLight),
-        titleTextStyle: GoogleFonts.sora(
+        titleTextStyle: GoogleFonts.inter(
           color: textPrimaryLight, fontSize: 22, fontWeight: FontWeight.w700,
         ),
       ),
@@ -121,7 +128,7 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 15),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           elevation: 0,
-          textStyle: GoogleFonts.sora(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: _inputTheme(Brightness.light),
@@ -160,7 +167,7 @@ class AppTheme {
         systemOverlayStyle: SystemUiOverlayStyle.light,
         centerTitle: false,
         iconTheme: const IconThemeData(color: textPrimaryDark),
-        titleTextStyle: GoogleFonts.sora(
+        titleTextStyle: GoogleFonts.inter(
           color: textPrimaryDark, fontSize: 22, fontWeight: FontWeight.w700,
         ),
       ),
@@ -180,7 +187,7 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 15),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           elevation: 0,
-          textStyle: GoogleFonts.sora(fontSize: 15, fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: _inputTheme(Brightness.dark),
@@ -209,34 +216,34 @@ class AppTheme {
     final secondary = isDark ? textSecondaryDark : textSecondaryLight;
 
     return TextTheme(
-      displayLarge: GoogleFonts.sora(
+      displayLarge: GoogleFonts.inter(
         fontSize: 40, fontWeight: FontWeight.w800, color: primary, letterSpacing: -1.5,
       ),
-      displayMedium: GoogleFonts.sora(
+      displayMedium: GoogleFonts.inter(
         fontSize: 32, fontWeight: FontWeight.w700, color: primary, letterSpacing: -1.0,
       ),
-      displaySmall: GoogleFonts.sora(
+      displaySmall: GoogleFonts.inter(
         fontSize: 26, fontWeight: FontWeight.w700, color: primary, letterSpacing: -0.5,
       ),
-      headlineLarge: GoogleFonts.sora(
+      headlineLarge: GoogleFonts.inter(
         fontSize: 26, fontWeight: FontWeight.w700, color: primary,
       ),
-      headlineMedium: GoogleFonts.sora(
+      headlineMedium: GoogleFonts.inter(
         fontSize: 22, fontWeight: FontWeight.w700, color: primary,
       ),
-      headlineSmall: GoogleFonts.sora(
+      headlineSmall: GoogleFonts.inter(
         fontSize: 18, fontWeight: FontWeight.w600, color: primary,
       ),
-      titleLarge: GoogleFonts.sora(
+      titleLarge: GoogleFonts.inter(
         fontSize: 17, fontWeight: FontWeight.w600, color: primary,
       ),
-      titleMedium: GoogleFonts.dmSans(
+      titleMedium: GoogleFonts.inter(
         fontSize: 15, fontWeight: FontWeight.w600, color: primary,
       ),
-      bodyLarge: GoogleFonts.dmSans(fontSize: 16, color: primary, height: 1.6),
-      bodyMedium: GoogleFonts.dmSans(fontSize: 14, color: primary, height: 1.5),
-      bodySmall: GoogleFonts.dmSans(fontSize: 12, color: secondary, height: 1.4),
-      labelLarge: GoogleFonts.dmSans(
+      bodyLarge: GoogleFonts.inter(fontSize: 16, color: primary, height: 1.6),
+      bodyMedium: GoogleFonts.inter(fontSize: 14, color: primary, height: 1.5),
+      bodySmall: GoogleFonts.inter(fontSize: 12, color: secondary, height: 1.4),
+      labelLarge: GoogleFonts.inter(
         fontSize: 14, fontWeight: FontWeight.w600, color: primary,
       ),
     );
@@ -259,7 +266,7 @@ class AppTheme {
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: primaryPurple, width: 2),
       ),
-      hintStyle: GoogleFonts.dmSans(
+      hintStyle: GoogleFonts.inter(
         color: isDark ? textSecondaryDark : textSecondaryLight, fontSize: 14,
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),

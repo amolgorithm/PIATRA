@@ -1,5 +1,6 @@
 // lib/ui/screens/home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../routes/app_routes.dart';
 import '../../core/constants/theme/app_theme.dart';
@@ -202,10 +203,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'PIATRA',
-                          style: TextStyle(
-                            fontFamily: 'Sora',
+                          style: GoogleFonts.inter(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 2.5,
@@ -265,8 +265,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     children: [
                       Text(
                         name != null ? 'Hello, $name' : "What's cooking\ntoday?",
-                        style: TextStyle(
-                          fontFamily: 'Sora',
+                        style: GoogleFonts.inter(
                           fontSize: name != null ? 28 : 34,
                           fontWeight: FontWeight.w800,
                           height: 1.15,
@@ -494,40 +493,49 @@ class _FeatureCardState extends State<_FeatureCard>
                 color: isDark ? AppTheme.cardDark : Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.06),
+                  color: isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.06),
                 ),
+                boxShadow: isDark
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    width: 38,
-                    height: 38,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryPurple.withOpacity(0.10),
-                      borderRadius: BorderRadius.circular(11),
+                      color: AppTheme.primaryPurple.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(widget.icon, color: AppTheme.primaryPurple, size: 19),
+                    child: Icon(widget.icon, color: AppTheme.primaryPurpleDeep, size: 22),
                   ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         widget.title,
-                        style: TextStyle(
+                        style: GoogleFonts.inter(
                           color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w700,
                           letterSpacing: -0.2,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(
                         widget.description,
-                        style: TextStyle(
+                        style: GoogleFonts.inter(
                           color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight,
-                          fontSize: 11,
+                          fontSize: 12.5,
                         ),
                       ),
                     ],

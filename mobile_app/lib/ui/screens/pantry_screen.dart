@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/pantry_item.dart';
 import '../../routes/app_routes.dart';
 import '../widgets/ingredient_card.dart';
@@ -682,8 +683,7 @@ class _MiniStat extends StatelessWidget {
                 child: Text(
                   value,
                   key: ValueKey(value),
-                  style: TextStyle(
-                    fontFamily: 'Sora',
+                  style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: color,
