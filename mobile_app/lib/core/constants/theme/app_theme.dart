@@ -10,8 +10,8 @@ class AppTheme {
   static const Color accentOrange     = Color(0xFFFF6B6B);
   static const Color accentAmber      = Color(0xFFFFB347);
 
-  // Light surface
-  static const Color backgroundLight  = Color(0xFFF4F3FF);
+  // Light surface — neutral off-white, not lavender-tinted
+  static const Color backgroundLight  = Color(0xFFF7F7F8);
   static const Color surfaceLight     = Color(0xFFFFFFFF);
   static const Color cardLight        = Color(0xFFFFFFFF);
   static const Color textPrimaryLight = Color(0xFF12111A);

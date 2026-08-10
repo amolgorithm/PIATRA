@@ -108,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               slivers: [
                 SliverToBoxAdapter(child: _buildHeroHeader(isDark)),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
                   sliver: SliverToBoxAdapter(
                     child: FadeTransition(
                       opacity: _gridFade,
@@ -162,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       Positioned(
                         bottom: -50 + t * 10,
                         left: -40 + t * 8,
-                        child: _Orb(size: 160, color: AppTheme.secondaryTeal.withOpacity(0.18)),
+                        child: _Orb(size: 160, color: Colors.white.withOpacity(0.08)),
                       ),
                     ],
                   );
@@ -182,7 +182,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: SlideTransition(
         position: _headerSlide,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -298,57 +298,51 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildFeatureGrid(BuildContext context, bool isDark) {
     final cards = [
-      _GlassFeatureCard(
+      _FeatureCard(
         delay: 0,
         icon: Icons.kitchen_rounded,
         title: 'My Pantry',
         description: 'Manage ingredients',
-        accentColor: const Color(0xFF6C63FF),
         onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
         parentAnim: _gridCtrl,
       ),
-      _GlassFeatureCard(
+      _FeatureCard(
         delay: 80,
         icon: Icons.camera_alt_rounded,
         title: 'Scan Items',
         description: 'Add with camera',
-        accentColor: const Color(0xFF00D4AA),
         onTap: () => Navigator.pushNamed(context, AppRoutes.scan),
         parentAnim: _gridCtrl,
       ),
-      _GlassFeatureCard(
+      _FeatureCard(
         delay: 160,
         icon: Icons.restaurant_menu_rounded,
         title: 'Recipes',
         description: 'Personalised picks',
-        accentColor: const Color(0xFFFF6B6B),
         onTap: () => Navigator.pushNamed(context, AppRoutes.recipes),
         parentAnim: _gridCtrl,
       ),
-      _GlassFeatureCard(
+      _FeatureCard(
         delay: 240,
         icon: Icons.bar_chart_rounded,
         title: 'Analytics',
         description: 'Nutrition history',
-        accentColor: const Color(0xFFFFB800),
         onTap: () => Navigator.pushNamed(context, AppRoutes.analytics),
         parentAnim: _gridCtrl,
       ),
-      _GlassFeatureCard(
+      _FeatureCard(
         delay: 320,
         icon: Icons.calendar_month_rounded,
         title: 'Meal Planner',
         description: 'Plan your week',
-        accentColor: const Color(0xFF4E9FF9),
         onTap: () => Navigator.pushNamed(context, AppRoutes.mealPlan),
         parentAnim: _gridCtrl,
       ),
-      _GlassFeatureCard(
+      _FeatureCard(
         delay: 400,
         icon: Icons.rate_review_rounded,
         title: 'Feedback',
         description: 'Help us improve',
-        accentColor: const Color(0xFFB24BF3),
         onTap: () => Navigator.pushNamed(context, AppRoutes.feedback),
         parentAnim: _gridCtrl,
       ),
@@ -405,30 +399,28 @@ class _Orb extends StatelessWidget {
   }
 }
 
-class _GlassFeatureCard extends StatefulWidget {
+class _FeatureCard extends StatefulWidget {
   final int delay;
   final IconData icon;
   final String title;
   final String description;
-  final Color accentColor;
   final VoidCallback onTap;
   final AnimationController parentAnim;
 
-  const _GlassFeatureCard({
+  const _FeatureCard({
     required this.delay,
     required this.icon,
     required this.title,
     required this.description,
-    required this.accentColor,
     required this.onTap,
     required this.parentAnim,
   });
 
   @override
-  State<_GlassFeatureCard> createState() => _GlassFeatureCardState();
+  State<_FeatureCard> createState() => _FeatureCardState();
 }
 
-class _GlassFeatureCardState extends State<_GlassFeatureCard>
+class _FeatureCardState extends State<_FeatureCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _pressCtrl;
   late Animation<double> _pressAnim;
@@ -473,6 +465,8 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTapDown: (_) => _pressCtrl.reverse(),
@@ -489,90 +483,56 @@ class _GlassFeatureCardState extends State<_GlassFeatureCard>
             animation: _pressAnim,
             builder: (_, child) =>
                 Transform.scale(scale: _pressAnim.value, child: child),
+            // flat card, one accent color used only for the small icon tile,
+            // no gradient blob, no saturated fill, no shadow. plain surface
+            // plus a thin hairline border, same language as the rest of
+            // the app now instead of six clashing accent colors
             child: Container(
-              height: 148,
+              height: 132,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: widget.accentColor.withOpacity(0.48),
-                borderRadius: BorderRadius.circular(22),
+                color: isDark ? AppTheme.cardDark : Colors.white,
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: widget.accentColor.withOpacity(0.65),
-                  width: 1,
+                  color: isDark ? Colors.white.withOpacity(0.06) : Colors.black.withOpacity(0.06),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: widget.accentColor.withOpacity(0.30),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: -20,
-                      right: -20,
-                      child: Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              widget.accentColor.withOpacity(0.50),
-                              Colors.transparent,
-                            ],
-                          ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryPurple.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(widget.icon, color: AppTheme.primaryPurple, size: 19),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: TextStyle(
+                          color: isDark ? AppTheme.textPrimaryDark : AppTheme.textPrimaryLight,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: -0.2,
                         ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: widget.accentColor.withOpacity(0.50),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: widget.accentColor.withOpacity(0.75),
-                                width: 1,
-                              ),
-                            ),
-                            child: Icon(widget.icon,
-                                color: Colors.white, size: 24),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.title,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                widget.description,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.90),
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.description,
+                        style: TextStyle(
+                          color: isDark ? AppTheme.textSecondaryDark : AppTheme.textSecondaryLight,
+                          fontSize: 11,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),

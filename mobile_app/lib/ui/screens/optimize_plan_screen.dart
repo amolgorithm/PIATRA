@@ -26,6 +26,10 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
   final _timeCtrl = TextEditingController(text: '300');
   final _proteinCtrl = TextEditingController(text: '350');
   final _sodiumCtrl = TextEditingController(text: '14000');
+  final _fiberCtrl = TextEditingController();
+  final _satFatCtrl = TextEditingController();
+  final _calorieCapCtrl = TextEditingController();
+  bool _showMoreConstraints = false;
   String _mode = 'lp';
 
   bool _loading = false;
@@ -42,7 +46,28 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
     _timeCtrl.dispose();
     _proteinCtrl.dispose();
     _sodiumCtrl.dispose();
+    _fiberCtrl.dispose();
+    _satFatCtrl.dispose();
+    _calorieCapCtrl.dispose();
     super.dispose();
+  }
+
+  // only include a constraint if the person actually typed something, an
+  // empty optional field shouldn't silently turn into a target of 0
+  Map<String, double> _minimums() {
+    final m = <String, double>{'protein_g': double.tryParse(_proteinCtrl.text) ?? 0};
+    final fiber = double.tryParse(_fiberCtrl.text);
+    if (fiber != null && fiber > 0) m['fiber_g'] = fiber;
+    return m;
+  }
+
+  Map<String, double> _maximums() {
+    final m = <String, double>{'sodium_mg': double.tryParse(_sodiumCtrl.text) ?? 0};
+    final satFat = double.tryParse(_satFatCtrl.text);
+    if (satFat != null && satFat > 0) m['saturated_fat_g'] = satFat;
+    final calCap = double.tryParse(_calorieCapCtrl.text);
+    if (calCap != null && calCap > 0) m['calories'] = calCap;
+    return m;
   }
 
   Future<void> _generate() async {
@@ -65,8 +90,8 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
 
     final result = await OptimizerService.instance.optimizeWeeklyPlan(
       candidates: priced,
-      nutrientMinimums: {'protein_g': double.tryParse(_proteinCtrl.text) ?? 0},
-      nutrientMaximums: {'sodium_mg': double.tryParse(_sodiumCtrl.text) ?? 0},
+      nutrientMinimums: _minimums(),
+      nutrientMaximums: _maximums(),
       budget: double.tryParse(_budgetCtrl.text) ?? 0,
       timeBudgetMinutes: double.tryParse(_timeCtrl.text) ?? 0,
       mode: _mode,
@@ -175,6 +200,36 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
             ],
           ),
           const SizedBox(height: 14),
+          GestureDetector(
+            onTap: () => setState(() => _showMoreConstraints = !_showMoreConstraints),
+            child: Row(
+              children: [
+                Icon(
+                  _showMoreConstraints ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                  size: 18,
+                  color: AppTheme.primaryPurple,
+                ),
+                const SizedBox(width: 4),
+                const Text(
+                  'More constraints (fiber, saturated fat, calories)',
+                  style: TextStyle(fontSize: 12.5, color: AppTheme.primaryPurple, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          if (_showMoreConstraints) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(child: _numberField('Fiber floor (g, optional)', _fiberCtrl)),
+                const SizedBox(width: 12),
+                Expanded(child: _numberField('Sat. fat cap (g, optional)', _satFatCtrl)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _numberField('Calorie cap (kcal, optional)', _calorieCapCtrl),
+          ],
+          const SizedBox(height: 14),
           _modeSwitch(isDark),
           const SizedBox(height: 18),
           SizedBox(
@@ -280,9 +335,17 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
     final modeLabel = _mode == 'qp' ? 'best-effort (soft targets)' : 'hard-target';
     final distinctRecipes = r.plan.length;
 
+    final activeConstraints = [
+      'protein floor',
+      if (_fiberCtrl.text.isNotEmpty) 'fiber floor',
+      'sodium cap',
+      if (_satFatCtrl.text.isNotEmpty) 'saturated fat cap',
+      if (_calorieCapCtrl.text.isNotEmpty) 'calorie cap',
+    ].join(', ');
+
     final steps = [
       'Looked at $_candidateCount recipes with pricing available.',
-      'Applied your protein floor, sodium cap, budget, and time limit.',
+      'Applied your $activeConstraints, plus budget and time limit.',
       'Solved a $modeLabel linear program over all $_candidateCount options.',
       r.isInfeasible
           ? 'No combination satisfied every constraint at once.'
@@ -385,8 +448,8 @@ class _OptimizePlanScreenState extends State<OptimizePlanScreen> {
         const SizedBox(height: 10),
         NutrientTargetChart(
           achieved: r.nutrientsAchieved,
-          minimums: {'protein_g': double.tryParse(_proteinCtrl.text) ?? 0},
-          maximums: {'sodium_mg': double.tryParse(_sodiumCtrl.text) ?? 0},
+          minimums: _minimums(),
+          maximums: _maximums(),
         ),
         const SizedBox(height: 12),
         SizedBox(
