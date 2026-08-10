@@ -4,35 +4,45 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // ── Core palette ───────────────────────────────────────────────────────────
-  // Single accent, two shades of the same purple. Deep for anything that
-  // needs to read clearly against white (buttons, icons), light only ever
-  // used as a low-opacity tint behind something, never as its own surface.
-  static const Color primaryPurple    = Color(0xFF6552E8);
-  static const Color primaryPurpleDeep = Color(0xFF4E3FC7);
-  static const Color secondaryTeal    = Color(0xFF00D4AA);
-  static const Color accentOrange     = Color(0xFFFF6B6B);
-  static const Color accentAmber      = Color(0xFFFFB347);
+  // Built directly off Tailwind CSS's published scales (Indigo + Slate),
+  // not hand-picked hex values. This is the same palette family behind most
+  // "clean SaaS dashboard" templates, so the tokens below are named after
+  // where they sit on that scale, easier to reason about than arbitrary hex.
+  //
+  // Indigo 700/900 — primary accent, dark enough that white text on top
+  // always clears WCAG AA (verified: indigo-700 = 7.9:1, indigo-900 = 11.4:1)
+  static const Color primaryPurple    = Color(0xFF4338CA); // indigo-700
+  static const Color primaryPurpleDeep = Color(0xFF312E81); // indigo-900
 
-  // Light surface — neutral off-white, not lavender-tinted
-  static const Color backgroundLight  = Color(0xFFF7F7F8);
+  // Semantic colors, one step darker than Tailwind's default 500 so they
+  // hold contrast both as solid button fills (white text on top) and as
+  // colored text sitting on their own light tint (the badge pattern used
+  // around the app), 500-level looked good but measured under 3:1 in the
+  // badge case
+  static const Color secondaryTeal    = Color(0xFF047857); // emerald-700
+  static const Color accentOrange     = Color(0xFFC2410C); // orange-700
+  static const Color accentAmber      = Color(0xFFB45309); // amber-700
+
+  // Light surface — Slate 50, neutral cool gray, not tinted toward the accent
+  static const Color backgroundLight  = Color(0xFFF8FAFC); // slate-50
   static const Color surfaceLight     = Color(0xFFFFFFFF);
   static const Color cardLight        = Color(0xFFFFFFFF);
-  static const Color textPrimaryLight = Color(0xFF12111A);
-  static const Color textSecondaryLight = Color(0xFF7B7A8E);
+  static const Color textPrimaryLight = Color(0xFF0F172A); // slate-900
+  static const Color textSecondaryLight = Color(0xFF64748B); // slate-500
 
-  // Dark surface — deep space aesthetic
-  static const Color backgroundDark   = Color(0xFF0D0C14);
-  static const Color surfaceDark      = Color(0xFF13121C);
-  static const Color cardDark         = Color(0xFF1C1A2A);
-  static const Color cardDarkElevated = Color(0xFF242235);
-  static const Color textPrimaryDark  = Color(0xFFEEECFF);
-  static const Color textSecondaryDark = Color(0xFF7C7A9A);
+  // Dark surface — same Slate scale, just the deep end of it
+  static const Color backgroundDark   = Color(0xFF020617); // slate-950
+  static const Color surfaceDark      = Color(0xFF0F172A); // slate-900
+  static const Color cardDark         = Color(0xFF1E293B); // slate-800
+  static const Color cardDarkElevated = Color(0xFF334155); // slate-700
+  static const Color textPrimaryDark  = Color(0xFFF8FAFC); // slate-50
+  static const Color textSecondaryDark = Color(0xFF94A3B8); // slate-400
 
-  // Semantic
-  static const Color successGreen   = Color(0xFF00D4AA);
-  static const Color errorRed       = Color(0xFFFF6B6B);
-  static const Color warningYellow  = Color(0xFFFFB347);
-  static const Color infoBlue       = Color(0xFF5B9EF9);
+  // Semantic — Tailwind's 600/700 shades, same reasoning as above
+  static const Color successGreen   = Color(0xFF047857); // emerald-700
+  static const Color errorRed       = Color(0xFFDC2626); // red-600
+  static const Color warningYellow  = Color(0xFFB45309); // amber-700
+  static const Color infoBlue       = Color(0xFF2563EB); // blue-600
 
   // Legacy aliases used across the app
   static const Color primaryGreen   = secondaryTeal;
@@ -42,32 +52,32 @@ class AppTheme {
 
   // ── Gradients ──────────────────────────────────────────────────────────────
   static const LinearGradient primaryGradient = LinearGradient(
-    colors: [Color(0xFF6552E8), Color(0xFF4E3FC7)],
+    colors: [Color(0xFF4338CA), Color(0xFF312E81)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient accentGradient = LinearGradient(
-    colors: [Color(0xFF00D4AA), Color(0xFF00A882)],
+    colors: [Color(0xFF047857), Color(0xFF065F46)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient warmGradient = LinearGradient(
-    colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
+    colors: [Color(0xFFC2410C), Color(0xFF9A3412)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient darkBgGradient = LinearGradient(
-    colors: [Color(0xFF0D0C14), Color(0xFF13121C)],
+    colors: [Color(0xFF020617), Color(0xFF0F172A)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
 
   // Mesh-style background glow for dark mode hero areas
   static RadialGradient get purpleGlow => const RadialGradient(
-    colors: [Color(0x336552E8), Color(0x00000000)],
+    colors: [Color(0x334338CA), Color(0x00000000)],
     radius: 0.8,
   );
 
