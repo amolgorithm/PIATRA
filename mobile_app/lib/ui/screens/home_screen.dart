@@ -302,7 +302,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         icon: Icons.kitchen_rounded,
         title: 'My Pantry',
         description: 'Manage ingredients',
-        accentColor: AppTheme.categoryIndigo,
+        accentColor: AppTheme.categoryBlue,
         onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
         parentAnim: _gridCtrl,
       ),
@@ -311,7 +311,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         icon: Icons.camera_alt_rounded,
         title: 'Scan Items',
         description: 'Add with camera',
-        accentColor: AppTheme.categoryEmerald,
+        accentColor: AppTheme.categoryGreen,
         onTap: () => Navigator.pushNamed(context, AppRoutes.scan),
         parentAnim: _gridCtrl,
       ),
@@ -320,7 +320,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         icon: Icons.restaurant_menu_rounded,
         title: 'Recipes',
         description: 'Personalised picks',
-        accentColor: AppTheme.categoryRose,
+        accentColor: AppTheme.categoryPink,
         onTap: () => Navigator.pushNamed(context, AppRoutes.recipes),
         parentAnim: _gridCtrl,
       ),
@@ -329,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         icon: Icons.bar_chart_rounded,
         title: 'Analytics',
         description: 'Nutrition history',
-        accentColor: AppTheme.categoryAmber,
+        accentColor: AppTheme.categoryOrange,
         onTap: () => Navigator.pushNamed(context, AppRoutes.analytics),
         parentAnim: _gridCtrl,
       ),
@@ -338,7 +338,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         icon: Icons.calendar_month_rounded,
         title: 'Meal Planner',
         description: 'Plan your week',
-        accentColor: AppTheme.categorySky,
+        accentColor: AppTheme.categoryTeal,
         onTap: () => Navigator.pushNamed(context, AppRoutes.mealPlan),
         parentAnim: _gridCtrl,
       ),
@@ -347,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         icon: Icons.rate_review_rounded,
         title: 'Feedback',
         description: 'Help us improve',
-        accentColor: AppTheme.categoryViolet,
+        accentColor: AppTheme.categoryPurple,
         onTap: () => Navigator.pushNamed(context, AppRoutes.feedback),
         parentAnim: _gridCtrl,
       ),
@@ -491,25 +491,25 @@ class _FeatureCardState extends State<_FeatureCard>
             builder: (_, child) =>
                 Transform.scale(scale: _pressAnim.value, child: child),
             // flat card, one accent color used only for the small icon tile,
-            // no gradient blob, no saturated fill, no shadow. plain surface
-            // plus a thin hairline border, same language as the rest of
-            // the app now instead of six clashing accent colors
+            // real color gap between card and page now (page F2F2F7, card
+            // white), that's what actually separates a card from the
+            // background, a border alone wasn't doing enough work before
             child: Container(
-              height: 132,
-              padding: const EdgeInsets.all(16),
+              height: 140,
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: isDark ? AppTheme.cardDark : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isDark ? Colors.white.withOpacity(0.07) : Colors.black.withOpacity(0.06),
-                ),
+                borderRadius: BorderRadius.circular(22),
+                border: isDark
+                    ? Border.all(color: Colors.white.withOpacity(0.08))
+                    : null,
                 boxShadow: isDark
                     ? null
                     : [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
+                          color: Colors.black.withOpacity(0.07),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
                         ),
                       ],
               ),

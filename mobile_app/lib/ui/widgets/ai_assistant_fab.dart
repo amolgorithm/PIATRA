@@ -221,7 +221,7 @@ class _AIAssistantFABState extends State<AIAssistantFAB>
                 decoration: BoxDecoration(
                   gradient: _isExpanded
                       ? const LinearGradient(
-                          colors: [Color(0xFFFF6B6B), Color(0xFFEE4444)],
+                          colors: [Color(0xFFFF3B30), Color(0xFFD70015)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         )
