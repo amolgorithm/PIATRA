@@ -409,22 +409,14 @@ class _OverviewButtonState extends State<_OverviewButton>
           width: 52,
           height: 52,
           decoration: BoxDecoration(
-            gradient: widget.open
-                ? const LinearGradient(
-                    colors: [Color(0xFF4E9FF9), Color(0xFF2D7FD9)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : const LinearGradient(
-                    colors: [Color(0xFF4E9FF9), Color(0xFF2D7FD9)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+            // was its own unrelated blue gradient, same brand gradient as
+            // the other two FABs now so the row reads as one control
+            // family instead of three different colors next to each other
+            gradient: AppTheme.primaryGradient,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF4E9FF9)
-                    .withOpacity(widget.open ? 0.65 : 0.45),
+                color: AppTheme.primaryPurple.withOpacity(widget.open ? 0.55 : 0.40),
                 blurRadius: widget.open ? 24 : 18,
                 spreadRadius: 0,
                 offset: const Offset(0, 6),

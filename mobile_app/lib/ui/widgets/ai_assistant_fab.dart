@@ -398,7 +398,7 @@ class _AIAssistantFABState extends State<AIAssistantFAB>
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.cardDarkElevated : const Color(0xFFF7F6FF),
+        color: isDark ? AppTheme.cardDarkElevated : AppTheme.primaryPurple.withOpacity(0.05),
         border: Border(
           top: BorderSide(
             color: isDark
@@ -484,7 +484,7 @@ class _Bubble extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark
             ? AppTheme.cardDarkElevated
-            : const Color(0xFFF4F3FF),
+            : AppTheme.primaryPurple.withOpacity(0.05),
         borderRadius: BorderRadius.circular(16).copyWith(
           topLeft: const Radius.circular(4),
         ),

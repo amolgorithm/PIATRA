@@ -86,23 +86,14 @@ class _ThemeToggleFABState extends State<ThemeToggleFAB>
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  gradient: isDark
-                      ? const LinearGradient(
-                          colors: [Color(0xFFFFD166), Color(0xFFFF9500)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : const LinearGradient(
-                          colors: [Color(0xFF1C1A30), Color(0xFF0D0C1A)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                  // was a separate amber/navy gradient here, unrelated to
+                  // every other FAB's color, one brand gradient for all
+                  // three now, the sun/moon icon still carries the meaning
+                  gradient: AppTheme.primaryGradient,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: isDark
-                          ? const Color(0xFFFFD166).withOpacity(0.50)
-                          : Colors.black.withOpacity(0.42),
+                      color: AppTheme.primaryPurple.withOpacity(0.40),
                       blurRadius: 20,
                       spreadRadius: 0,
                       offset: const Offset(0, 6),

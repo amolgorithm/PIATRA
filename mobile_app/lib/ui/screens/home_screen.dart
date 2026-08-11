@@ -302,6 +302,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         icon: Icons.kitchen_rounded,
         title: 'My Pantry',
         description: 'Manage ingredients',
+        accentColor: AppTheme.categoryIndigo,
         onTap: () => Navigator.pushNamed(context, AppRoutes.pantry),
         parentAnim: _gridCtrl,
       ),
@@ -310,6 +311,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         icon: Icons.camera_alt_rounded,
         title: 'Scan Items',
         description: 'Add with camera',
+        accentColor: AppTheme.categoryEmerald,
         onTap: () => Navigator.pushNamed(context, AppRoutes.scan),
         parentAnim: _gridCtrl,
       ),
@@ -318,6 +320,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         icon: Icons.restaurant_menu_rounded,
         title: 'Recipes',
         description: 'Personalised picks',
+        accentColor: AppTheme.categoryRose,
         onTap: () => Navigator.pushNamed(context, AppRoutes.recipes),
         parentAnim: _gridCtrl,
       ),
@@ -326,6 +329,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         icon: Icons.bar_chart_rounded,
         title: 'Analytics',
         description: 'Nutrition history',
+        accentColor: AppTheme.categoryAmber,
         onTap: () => Navigator.pushNamed(context, AppRoutes.analytics),
         parentAnim: _gridCtrl,
       ),
@@ -334,6 +338,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         icon: Icons.calendar_month_rounded,
         title: 'Meal Planner',
         description: 'Plan your week',
+        accentColor: AppTheme.categorySky,
         onTap: () => Navigator.pushNamed(context, AppRoutes.mealPlan),
         parentAnim: _gridCtrl,
       ),
@@ -342,6 +347,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         icon: Icons.rate_review_rounded,
         title: 'Feedback',
         description: 'Help us improve',
+        accentColor: AppTheme.categoryViolet,
         onTap: () => Navigator.pushNamed(context, AppRoutes.feedback),
         parentAnim: _gridCtrl,
       ),
@@ -403,6 +409,7 @@ class _FeatureCard extends StatefulWidget {
   final IconData icon;
   final String title;
   final String description;
+  final Color accentColor;
   final VoidCallback onTap;
   final AnimationController parentAnim;
 
@@ -411,6 +418,7 @@ class _FeatureCard extends StatefulWidget {
     required this.icon,
     required this.title,
     required this.description,
+    required this.accentColor,
     required this.onTap,
     required this.parentAnim,
   });
@@ -513,10 +521,17 @@ class _FeatureCardState extends State<_FeatureCard>
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryPurple.withOpacity(0.12),
+                      color: widget.accentColor,
                       borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.accentColor.withOpacity(0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: Icon(widget.icon, color: AppTheme.primaryPurpleDeep, size: 22),
+                    child: Icon(widget.icon, color: Colors.white, size: 22),
                   ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
