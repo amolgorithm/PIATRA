@@ -17,6 +17,7 @@ import '../../state/user_provider.dart';
 import '../../models/user_profile_model.dart';
 import 'shopping_list_screen.dart';
 import 'optimize_plan_screen.dart';
+import 'batch_cook_screen.dart';
 import '../widgets/weekly_nutrition_card.dart';
 
 class MealPlanScreen extends StatefulWidget {
@@ -177,6 +178,17 @@ class _MealPlanScreenState extends State<MealPlanScreen> {
                 foregroundColor: AppTheme.primaryPurple,
               ),
             ),
+          TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BatchCookScreen()),
+            ),
+            icon: const Icon(Icons.schedule_rounded, size: 18),
+            label: const Text('Batch cook'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.primaryPurple,
+            ),
+          ),
         ],
       ),
     );

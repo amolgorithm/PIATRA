@@ -130,12 +130,14 @@ class SpoonacularStep {
   final String step;
   final List<String> ingredients;
   final List<String> equipment;
+  final int? lengthMinutes; // not always present in spoonacular's data
 
   SpoonacularStep({
     required this.number,
     required this.step,
     required this.ingredients,
     required this.equipment,
+    this.lengthMinutes,
   });
 
   factory SpoonacularStep.fromJson(Map<String, dynamic> j) =>
@@ -150,7 +152,37 @@ class SpoonacularStep {
                 ?.map((e) => (e as Map)['name'].toString())
                 .toList() ??
             [],
+        lengthMinutes: (j['length'] as Map<String, dynamic>?)?['number'] != null
+            ? ((j['length'] as Map<String, dynamic>)['number'] as num).toInt()
+            : null,
       );
+
+  // spoonacular only gives per-step timing on some recipes. when it's
+  // missing, fall back to a rough guess from the instruction text, still
+  // better than pretending every step takes the same length of time
+  double estimateDuration() {
+    if (lengthMinutes != null) return lengthMinutes!.toDouble();
+    final lower = step.toLowerCase();
+    if (lower.contains('bake') || lower.contains('roast') || lower.contains('simmer')) return 20;
+    if (lower.contains('marinate') || lower.contains('chill') || lower.contains('rest')) return 15;
+    if (lower.contains('boil')) return 10;
+    return 5;
+  }
+
+  // rough mapping from spoonacular's equipment list to a kitchen resource,
+  // used by the batch-cook scheduler to figure out what's competing with what
+  String estimateResource() {
+    final eq = equipment.map((e) => e.toLowerCase()).join(' ');
+    if (eq.contains('oven')) return 'oven';
+    if (eq.contains('stove') ||
+        eq.contains('pan') ||
+        eq.contains('pot') ||
+        eq.contains('skillet') ||
+        eq.contains('wok')) {
+      return 'stove';
+    }
+    return 'hands';
+  }
 }
 
 /// Full recipe as returned by Spoonacular's /recipes/{id}/information endpoint

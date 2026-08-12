@@ -33,4 +33,5 @@ class AppConfig {
   static String get feedbackUrl          => '$baseUrl/api/feedback/';
 
   static String get optimizeMealPlanUrl  => '$baseUrl/api/optimize/meal-plan';
+  static String get batchScheduleUrl     => '$baseUrl/api/schedule/batch-cook';
 }
