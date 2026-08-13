@@ -6,6 +6,7 @@ from .users import router as users_router
 from .feedback   import router as feedback_router
 from .optimize import router as optimize_router
 from .schedule import router as schedule_router
+from .ingredients import router as ingredients_router
 
 # For backward compatibility
 assistant = assistant_router
@@ -16,3 +17,4 @@ users = users_router
 feedback  = feedback_router
 optimize = optimize_router
 schedule = schedule_router
+ingredients = ingredients_router

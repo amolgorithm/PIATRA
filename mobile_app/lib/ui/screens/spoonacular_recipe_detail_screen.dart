@@ -5,6 +5,7 @@ import '../../core/constants/theme/app_theme.dart';
 import 'cooking_mode_screen.dart';
 import '../../services/recipe_ranking_engine.dart';
 import '../../services/spoonacular_service.dart';
+import '../widgets/substitute_sheet.dart';
 
 class SpoonacularRecipeDetailScreen extends StatefulWidget {
   final RankedRecipe ranked;
@@ -361,6 +362,23 @@ class _IngredientRow extends StatelessWidget {
                   color: inPantry ? null : AppTheme.textSecondaryLight),
             ),
           ),
+          if (!inPantry)
+            GestureDetector(
+              onTap: () => SubstituteSheet.show(context, ingredient.name),
+              child: Container(
+                margin: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryPurple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('Sub',
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: AppTheme.primaryPurple,
+                        fontWeight: FontWeight.bold)),
+              ),
+            ),
           if (!inPantry)
             Container(
               padding:
