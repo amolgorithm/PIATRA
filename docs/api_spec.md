@@ -411,6 +411,39 @@ Each candidate's vector is built from its nutrient profile (same shape Feature 1
 
 ---
 
+## Energy Model — `/api/energy`
+
+### `POST /api/energy/curve`
+
+Predicted post-meal glucose/energy response, a coupled pair of first-order ODEs solved numerically (scipy RK45), parameterized by an estimated glycemic load derived from the recipe's aggregate macros (carbs, fiber, sugar, protein, fat, same shape Features 1/3/4 use).
+
+**This is a simplified, comparative model, not a clinical or diagnostic tool.** `glucose`/`insulin` values are relative response units, not real blood glucose in mg/dL. Useful for comparing "will this meal or that one keep me steadier through a study session," not for any medical purpose.
+
+**Request body**
+```json
+{ "nutrients": { "carbs_g": 90, "fiber_g": 2, "sugar_g": 30, "protein_g": 8, "fat_g": 3 }, "duration_minutes": 180 }
+```
+
+**Response `200`**
+```json
+{
+  "times_minutes": [0, 5, 10, "..."],
+  "glucose": [0.0, 0.31, 0.98, "..."],
+  "insulin": [0.0, 0.01, 0.03, "..."],
+  "glycemic_load_estimate": 47.2,
+  "peak_glucose": 50.08,
+  "peak_time_minutes": 60.0,
+  "steepest_drop_per_minute": -0.928,
+  "possible_energy_dip": true,
+  "note": "Simplified comparative model, not a clinical or diagnostic tool. Units are relative, not real blood glucose."
+}
+```
+`possible_energy_dip` is a rough flag (steepest post-peak drop below a tuned threshold), not a diagnosis.
+
+**Response `500`** — model error
+
+---
+
 ## Stub Endpoints
 
 The following endpoints exist as router stubs and return placeholder responses. They are reserved for future server-side implementation; the current app manages this data client-side via Firestore and Spoonacular.

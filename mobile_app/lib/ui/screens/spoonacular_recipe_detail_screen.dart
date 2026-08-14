@@ -6,6 +6,9 @@ import 'cooking_mode_screen.dart';
 import '../../services/recipe_ranking_engine.dart';
 import '../../services/spoonacular_service.dart';
 import '../widgets/substitute_sheet.dart';
+import '../widgets/energy_curve_chart.dart';
+import '../../services/nutrient_mapper.dart';
+import '../../services/energy_service.dart';
 
 class SpoonacularRecipeDetailScreen extends StatefulWidget {
   final RankedRecipe ranked;
@@ -165,6 +168,10 @@ class _SpoonacularRecipeDetailScreenState
                   _NutritionCard(nutrition: r.nutrition),
                   const SizedBox(height: 20),
 
+                  // ── Energy curve ────────────────────────────────────────────
+                  _EnergyCurveSection(nutrition: r.nutrition),
+                  const SizedBox(height: 20),
+
                   // ── Ingredients ─────────────────────────────────────────────
                   const Text('Ingredients',
                       style: TextStyle(
@@ -269,6 +276,81 @@ class _StatChip extends StatelessWidget {
                   fontWeight: FontWeight.w600)),
         ],
       ),
+    );
+  }
+}
+
+class _EnergyCurveSection extends StatefulWidget {
+  final SpoonacularNutrition nutrition;
+  const _EnergyCurveSection({required this.nutrition});
+
+  @override
+  State<_EnergyCurveSection> createState() => _EnergyCurveSectionState();
+}
+
+class _EnergyCurveSectionState extends State<_EnergyCurveSection> {
+  bool _expanded = false;
+  bool _loading = false;
+  String? _error;
+  EnergyCurve? _curve;
+
+  Future<void> _load() async {
+    setState(() {
+      _expanded = true;
+      _loading = true;
+      _error = null;
+    });
+
+    final nutrients = NutrientMapper.toOptimizerNutrients(widget.nutrition);
+    final curve = await EnergyService.instance.getEnergyCurve(nutrients);
+
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      _curve = curve;
+      if (curve == null) _error = EnergyService.instance.lastError ?? 'Something went wrong, try again.';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _curve == null && !_loading ? _load : () => setState(() => _expanded = !_expanded),
+          child: Row(
+            children: [
+              const Icon(Icons.bolt_rounded, size: 18, color: AppTheme.primaryPurple),
+              const SizedBox(width: 8),
+              const Text('Energy Curve',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              Icon(
+                _expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                size: 20,
+                color: AppTheme.textSecondaryLight,
+              ),
+            ],
+          ),
+        ),
+        if (_expanded) ...[
+          const SizedBox(height: 12),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: CircularProgressIndicator(color: AppTheme.primaryPurple)),
+            )
+          else if (_error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(_error!, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondaryLight)),
+            )
+          else if (_curve != null)
+            EnergyCurveChart(curve: _curve!),
+        ],
+      ],
     );
   }
 }
