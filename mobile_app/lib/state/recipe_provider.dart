@@ -18,6 +18,7 @@ import '../models/user_profile_model.dart';
 import '../services/spoonacular_service.dart';
 import '../services/recipe_ranking_engine.dart';
 import '../services/pantry_service.dart';
+import '../services/diversity_service.dart';
 
 export '../services/recipe_ranking_engine.dart' show RankedRecipe, RankingResult;
 
@@ -55,6 +56,70 @@ class RecipeProvider extends ChangeNotifier {
 
   bool get isLoading => _loadState == RecipeLoadState.loading;
   bool get hasResults => _rankedRecipes.isNotEmpty;
+
+  // diversify: reorders the current top results with a greedy
+  // correlation-minimizing pick instead of plain top-k by score, so the
+  // list isn't five near-identical recipes. keeps the original ranked
+  // order cached so toggling back off is instant, no re-fetch needed.
+  bool _isDiversifying = false;
+  bool get isDiversifying => _isDiversifying;
+
+  bool _isDiversified = false;
+  bool get isDiversified => _isDiversified;
+
+  String? _diversityError;
+  String? get diversityError => _diversityError;
+
+  List<RankedRecipe>? _preDiversityOrder;
+
+  Future<void> diversify() async {
+    if (_rankedRecipes.length < 3) {
+      _diversityError = 'Need at least 3 results to diversify.';
+      notifyListeners();
+      return;
+    }
+
+    _isDiversifying = true;
+    _diversityError = null;
+    notifyListeners();
+
+    // only send the current top slice, no need to ship the whole list
+    // over the wire for something that's picking from the best options
+    final pool = _rankedRecipes.take(15).toList();
+    final byId = {for (final r in pool) r.recipe.id.toString(): r};
+
+    final result = await DiversityService.instance.diversify(
+      candidates: pool,
+      k: pool.length < 8 ? pool.length : 8,
+    );
+
+    _isDiversifying = false;
+
+    if (result == null) {
+      _diversityError = DiversityService.instance.lastError ?? 'Something went wrong, try again.';
+      notifyListeners();
+      return;
+    }
+
+    _preDiversityOrder ??= List.of(_rankedRecipes);
+    final reordered = result.map((item) => byId[item.id]).whereType<RankedRecipe>().toList();
+    // anything that didn't make the diversified cut still exists, just
+    // tacked on after so the list doesn't shrink out from under the user
+    final remaining = pool.where((r) => !reordered.contains(r)).toList();
+    _rankedRecipes = [...reordered, ...remaining, ..._rankedRecipes.skip(pool.length)];
+    _isDiversified = true;
+    notifyListeners();
+  }
+
+  void clearDiversify() {
+    if (_preDiversityOrder != null) {
+      _rankedRecipes = _preDiversityOrder!;
+      _preDiversityOrder = null;
+    }
+    _isDiversified = false;
+    _diversityError = null;
+    notifyListeners();
+  }
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -264,5 +329,8 @@ class RecipeProvider extends ChangeNotifier {
     _pantryMatchWarning = result.pantryMatchWarning;
     _hasFallbackSection = result.hasFallbackSection;
     _fallbackStartIndex = result.fallbackStartIndex;
+    // fresh ranking, any cached pre-diversify order is stale now
+    _preDiversityOrder = null;
+    _isDiversified = false;
   }
 }

@@ -375,6 +375,42 @@ Solves for the cheapest set of recipes that hits the user's nutrient targets und
 
 ---
 
+## Diversity — `/api/diversity`
+
+### `POST /api/diversity/select`
+
+Greedy correlation-minimizing selection over a set of already-scored candidates. Fixes the "five near-identical recipes" problem: ranking by quality alone returns near-duplicates because they score similarly by definition. At each step picks whichever remaining candidate has the best `quality - alpha * avg_similarity_to_already_picked`, same idea as portfolio diversification, just greedy instead of solved exactly.
+
+Each candidate's vector is built from its nutrient profile (same shape Feature 1/3 use), z-scored, compared by cosine similarity.
+
+**Request body**
+```json
+{
+  "candidates": [
+    { "id": "recipe_1", "name": "Chicken Stir Fry", "quality": 95, "nutrients": { "calories": 450, "protein_g": 38 } }
+  ],
+  "k": 5,
+  "alpha": 6.0
+}
+```
+`alpha` defaults to 6.0, tuned by testing against a mock "4 near-identical recipes + 3 different ones" case, low alpha (under ~2) barely changes anything against this app's typical 0-100 quality-score gaps, alpha in the 5-8 range is where genuinely different picks start winning over near-duplicates.
+
+**Response `200`**
+```json
+{
+  "selected": [
+    { "id": "recipe_1", "name": "Chicken Stir Fry", "quality": 95.0, "avg_similarity_at_pick": 0.0 },
+    { "id": "recipe_5", "name": "Lentil Soup", "quality": 88.0, "avg_similarity_at_pick": -0.967 }
+  ]
+}
+```
+`avg_similarity_at_pick` is the average cosine similarity to everything already selected at the moment this item was picked, negative means it was a genuine change of pace, close to 1 means it was still fairly similar to what came before.
+
+**Response `400`** — empty candidates list
+**Response `500`** — engine error
+
+---
+
 ## Stub Endpoints
 
 The following endpoints exist as router stubs and return placeholder responses. They are reserved for future server-side implementation; the current app manages this data client-side via Firestore and Spoonacular.

@@ -111,7 +111,9 @@ class _AppBarSection extends StatelessWidget {
                   Text(
                     p.isLoading
                         ? 'Finding the best matches…'
-                        : '${p.rankedRecipes.length} personalised results',
+                        : p.isDiversified
+                            ? '${p.rankedRecipes.length} results, reordered for variety'
+                            : '${p.rankedRecipes.length} personalised results',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -169,6 +171,37 @@ class _AppBarSection extends StatelessWidget {
               icon: const Icon(Icons.sort_rounded),
               style: IconButton.styleFrom(
                 backgroundColor: isDark ? AppTheme.cardDark : Colors.white,
+              ),
+            ),
+          ),
+          // Diversify toggle — greedy correlation-minimizing reorder so
+          // the top results aren't five near-identical recipes
+          Consumer<RecipeProvider>(
+            builder: (ctx, p, _) => IconButton(
+              tooltip: p.isDiversified ? 'Back to top matches' : 'Diversify results',
+              onPressed: p.isDiversifying || p.rankedRecipes.length < 3
+                  ? null
+                  : () async {
+                      if (p.isDiversified) {
+                        ctx.read<RecipeProvider>().clearDiversify();
+                        return;
+                      }
+                      await ctx.read<RecipeProvider>().diversify();
+                      final err = ctx.read<RecipeProvider>().diversityError;
+                      if (err != null && ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(err)));
+                      }
+                    },
+              icon: p.isDiversifying
+                  ? const SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryPurple),
+                    )
+                  : Icon(Icons.shuffle_rounded, color: p.isDiversified ? Colors.white : null),
+              style: IconButton.styleFrom(
+                backgroundColor: p.isDiversified
+                    ? AppTheme.primaryPurple
+                    : (isDark ? AppTheme.cardDark : Colors.white),
               ),
             ),
           ),

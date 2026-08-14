@@ -35,4 +35,5 @@ class AppConfig {
   static String get optimizeMealPlanUrl  => '$baseUrl/api/optimize/meal-plan';
   static String get batchScheduleUrl     => '$baseUrl/api/schedule/batch-cook';
   static String get ingredientsBaseUrl   => '$baseUrl/api/ingredients';
+  static String get diversitySelectUrl   => '$baseUrl/api/diversity/select';
 }
